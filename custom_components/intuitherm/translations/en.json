@@ -1,0 +1,91 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to IntuiTherm Service",
+        "description": "Enter your IntuiTherm service connection details. The service optimizes your battery charging and discharging schedule using Model Predictive Control.",
+        "data": {
+          "service_url": "Service URL",
+          "api_key": "API Key",
+          "update_interval": "Update Interval (seconds)"
+        },
+        "data_description": {
+          "service_url": "URL of your IntuiTherm service (e.g., http://128.140.44.143:80)",
+          "api_key": "Bearer token for API authentication",
+          "update_interval": "How often to poll the service for updates (30-300 seconds)"
+        }
+      },
+      "auto_detect": {
+        "title": "Auto-Detect Energy Sensors",
+        "description": "IntuiTherm can automatically detect your battery, solar, and house load sensors from the Home Assistant Energy Dashboard. Click Submit to start auto-detection, or click Skip to configure manually."
+      },
+      "review": {
+        "title": "Review Detected Sensors",
+        "description": "Review the automatically detected sensors below. You can change any selection or leave fields blank if not applicable. These sensors help IntuiTherm optimize your battery schedule.",
+        "data": {
+          "battery_soc_entity": "Battery State of Charge (%)",
+          "solar_power_entity": "Solar Power (kW)",
+          "house_load_entity": "House Load (kW)"
+        },
+        "data_description": {
+          "battery_soc_entity": "Sensor showing battery charge percentage (0-100%)",
+          "solar_power_entity": "Sensor showing current solar production in kW",
+          "house_load_entity": "Sensor showing current house consumption in kW"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to IntuiTherm service. Please check the service URL and ensure the service is running.",
+      "invalid_api_key": "Invalid API key. Please check your API key and try again.",
+      "timeout_connect": "Connection timeout. The service took too long to respond. Please check if the service is reachable.",
+      "unknown": "Unexpected error occurred. Please check the logs for more details."
+    },
+    "abort": {
+      "already_configured": "This IntuiTherm service is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure IntuiTherm Options",
+        "description": "Update your IntuiTherm integration settings.",
+        "data": {
+          "service_url": "Service URL",
+          "api_key": "API Key",
+          "update_interval": "Update Interval (seconds)",
+          "battery_soc_entity": "Battery State of Charge (%)",
+          "solar_power_entity": "Solar Power (kW)",
+          "house_load_entity": "House Load (kW)"
+        },
+        "data_description": {
+          "service_url": "URL of your IntuiTherm service (e.g., http://128.140.44.143:80)",
+          "api_key": "Bearer token for API authentication",
+          "update_interval": "How often to poll the service for updates (30-300 seconds)",
+          "battery_soc_entity": "Sensor showing battery charge percentage (0-100%)",
+          "solar_power_entity": "Sensor showing current solar production in kW",
+          "house_load_entity": "Sensor showing current house consumption in kW"
+        }
+      }
+    }
+  },
+  "services": {
+    "manual_override": {
+      "name": "Manual Override",
+      "description": "Manually override the battery control mode for a specified duration.",
+      "fields": {
+        "action": {
+          "name": "Action",
+          "description": "The control action to execute (e.g., 'force_charge', 'self_use', 'backup')"
+        },
+        "power_kw": {
+          "name": "Power (kW)",
+          "description": "Target power setpoint in kW (0-3.0 kW)"
+        },
+        "duration_minutes": {
+          "name": "Duration (minutes)",
+          "description": "How long to apply the override (1-1440 minutes)"
+        }
+      }
+    }
+  }
+}
