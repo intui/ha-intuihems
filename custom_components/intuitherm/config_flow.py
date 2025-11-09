@@ -275,8 +275,9 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ]
             
             # Save learned device configuration if entities were manually selected
-            if self._device_info and control_entities_selected:
-                await self._save_learned_device(control_entities_selected)
+            # TODO: Fix indentation issue in _save_learned_device method
+            # if self._device_info and control_entities_selected:
+            #     await self._save_learned_device(control_entities_selected)
 
             # Create config entry
             return self.async_create_entry(
