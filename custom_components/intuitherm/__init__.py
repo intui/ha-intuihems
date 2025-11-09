@@ -69,8 +69,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Forward entry setup to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register services
+    # Register services (manual override + device learning)
     await async_setup_services(hass, entry)
+    
+    # Register device learning services (only once for all entries)
+    if not hass.services.has_service(DOMAIN, "list_learned_devices"):
+        from .services import async_setup_services as setup_device_services
+        await setup_device_services(hass)
 
     # Register options update listener
     entry.async_on_unload(entry.add_update_listener(update_listener))

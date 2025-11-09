@@ -69,6 +69,42 @@ SENSOR_TYPE_MPC_RUNS_24H: Final = "mpc_runs_24h"
 # Switch types
 SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"
 
+# Device-based control entity mappings
+# Maps (platform, manufacturer, model_pattern) -> control entity patterns
+DEVICE_CONTROL_MAPPINGS: Final = {
+    # FoxESS inverters
+    ("foxess", "FoxESS", None): {
+        "mode_select_patterns": ["work_mode", "battery_mode"],
+        "charge_power_patterns": ["force_charge_power", "charge_power"],
+        "discharge_power_patterns": ["force_discharge_power", "discharge_power"],
+        "mode_options": ["Force Charge", "Self Use", "Back-up"],
+    },
+    # Solis inverters (similar to FoxESS)
+    ("solis", "Solis", None): {
+        "mode_select_patterns": ["work_mode", "battery_mode", "operating_mode"],
+        "charge_power_patterns": ["charge_power", "battery_charge_limit"],
+        "discharge_power_patterns": ["discharge_power", "battery_discharge_limit"],
+    },
+    # SolarEdge StorEdge systems
+    ("solaredge", "SolarEdge", "StorEdge"): {
+        "mode_select_patterns": ["storage_control_mode", "battery_mode"],
+        "charge_power_patterns": ["storage_charge_limit"],
+        "discharge_power_patterns": ["storage_discharge_limit"],
+    },
+    # Huawei FusionSolar
+    ("huawei_solar", "Huawei", None): {
+        "mode_select_patterns": ["storage_working_mode", "battery_working_mode"],
+        "charge_power_patterns": ["storage_maximum_charging_power"],
+        "discharge_power_patterns": ["storage_maximum_discharging_power"],
+    },
+    # Growatt systems
+    ("growatt_server", "Growatt", None): {
+        "mode_select_patterns": ["work_mode", "battery_mode"],
+        "charge_power_patterns": ["battery_charge_rate"],
+        "discharge_power_patterns": ["battery_discharge_rate"],
+    },
+}
+
 # Attributes
 ATTR_ACTION: Final = "action"
 ATTR_POWER_KW: Final = "power_kw"

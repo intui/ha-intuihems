@@ -35,7 +35,9 @@ from .const import (
     DEFAULT_SERVICE_URL,
     DEFAULT_UPDATE_INTERVAL,
     ENDPOINT_HEALTH,
+    DEVICE_CONTROL_MAPPINGS,
 )
+from .device_learning import async_setup_device_learning
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +61,8 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._api_key: str | None = None
         self._update_interval: int = DEFAULT_UPDATE_INTERVAL
         self._detected_entities: dict[str, Any] = {}
+        self._device_info: dict[str, Any] | None = None  # Track device for learning
+        self._device_learning_store = None  # Will be initialized when needed
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -171,6 +175,10 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             for device_id, device_info in devices.items():
                 sensors = await self._find_power_sensors(device_id)
                 if sensors:
+                    # Store device info for potential learning
+                    if sensors.get("device_info") and not self._device_info:
+                        self._device_info = sensors["device_info"]
+                    
                     # Store best matches
                     if sensors.get("battery_soc") and not self._detected_entities.get(
                         CONF_BATTERY_SOC_ENTITY
@@ -192,6 +200,26 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         self._detected_entities[CONF_HOUSE_LOAD_ENTITY] = sensors[
                             "house_load"
                         ]["entity_id"]
+                    
+                    # Store detected battery control entities
+                    if sensors.get("control_entities"):
+                        control_entities = sensors["control_entities"]
+                        if control_entities.get(CONF_BATTERY_MODE_SELECT):
+                            self._detected_entities[CONF_BATTERY_MODE_SELECT] = control_entities[
+                                CONF_BATTERY_MODE_SELECT
+                            ]
+                        if control_entities.get(CONF_BATTERY_CHARGE_POWER):
+                            self._detected_entities[CONF_BATTERY_CHARGE_POWER] = control_entities[
+                                CONF_BATTERY_CHARGE_POWER
+                            ]
+                        if control_entities.get(CONF_BATTERY_DISCHARGE_POWER):
+                            self._detected_entities[CONF_BATTERY_DISCHARGE_POWER] = control_entities[
+                                CONF_BATTERY_DISCHARGE_POWER
+                            ]
+            
+            # Check for learned patterns if no control entities detected
+            if self._device_info and not self._detected_entities.get(CONF_BATTERY_MODE_SELECT):
+                await self._check_learned_patterns()
 
             # Priority 1: Try Energy Dashboard cumulative sensors first (best source of truth)
             # These are kWh sensors that the backend will convert to kW via derivatives
@@ -264,6 +292,25 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._detected_entities[CONF_HOUSE_LOAD_ENTITY] = user_input.get(
                 CONF_HOUSE_LOAD_ENTITY
             )
+            
+            # Check if user selected control entities for an unknown device
+            control_entities_selected = {}
+            if user_input.get(CONF_BATTERY_MODE_SELECT):
+                control_entities_selected[CONF_BATTERY_MODE_SELECT] = user_input[
+                    CONF_BATTERY_MODE_SELECT
+                ]
+            if user_input.get(CONF_BATTERY_CHARGE_POWER):
+                control_entities_selected[CONF_BATTERY_CHARGE_POWER] = user_input[
+                    CONF_BATTERY_CHARGE_POWER
+                ]
+            if user_input.get(CONF_BATTERY_DISCHARGE_POWER):
+                control_entities_selected[CONF_BATTERY_DISCHARGE_POWER] = user_input[
+                    CONF_BATTERY_DISCHARGE_POWER
+                ]
+            
+            # Save learned device configuration if entities were manually selected
+            if self._device_info and control_entities_selected:
+                await self._save_learned_device(control_entities_selected)
 
             # Create config entry
             return self.async_create_entry(
@@ -274,12 +321,55 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_UPDATE_INTERVAL: self._update_interval,
                     CONF_DETECTED_ENTITIES: self._detected_entities,
                 },
+            )   )
+
+    async def _save_learned_device(self, control_entities: dict[str, str]) -> None:
+        """Save learned device configuration.
+        
+        Args:
+            control_entities: User-selected control entities
+        """
+        if not self._device_info:
+            return
+        
+        # Initialize learning store if needed
+        if not self._device_learning_store:
+            try:
+                self._device_learning_store = await async_setup_device_learning(self.hass)
+            except Exception as err:
+                _LOGGER.error("Could not initialize device learning: %s", err)
+                return
+        
+        # Check if this is a new device (not in built-in mappings)
+        platform = self._device_info.get("platform", "").lower()
+        manufacturer = self._device_info.get("manufacturer", "").lower()
+        model = self._device_info.get("model", "").lower()
+        
+        is_unknown_device = True
+        for (map_platform, map_manufacturer, map_model), _ in DEVICE_CONTROL_MAPPINGS.items():
+            if platform == map_platform.lower():
+                if map_manufacturer and map_manufacturer.lower() in manufacturer:
+                    if not map_model or map_model.lower() in model:
+                        is_unknown_device = False
+                        break
+        
+        if is_unknown_device and control_entities:
+            _LOGGER.info(
+                "Saving learned configuration for unknown device: %s %s",
+                self._device_info.get("manufacturer"),
+                self._device_info.get("model"),
+            )
+            
+            # Save the configuration (with opt-in for community sharing)
+            await self._device_learning_store.async_save_device_config(
+                device_info=self._device_info,
+                control_entities=control_entities,
+                user_notes=f"Configured via IntuiTherm setup on {self.hass.config.location_name}",
+                share_with_community=True,  # User can opt-out in settings later
             )
 
         # Get all available sensors for dropdowns
-        entity_registry = er.async_get(self.hass)
-
-        # Battery SOC sensors (device_class=battery, unit=%)
+        entity_registry = er.async_get(self.hass)        # Battery SOC sensors (device_class=battery, unit=%)
         soc_entities = {
             entry.entity_id: f"{entry.entity_id} ({entry.original_name or entry.entity_id})"
             for entry in entity_registry.entities.values()
@@ -445,8 +535,27 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return devices
 
     async def _find_power_sensors(self, device_id: str) -> dict[str, Any]:
-        """Find relevant power sensors on a device."""
+        """Find relevant power sensors and control entities on a device."""
         entity_registry = er.async_get(self.hass)
+        device_registry = dr.async_get(self.hass)
+
+        # Get device info to check for known inverter brands
+        device = device_registry.async_get(device_id)
+        device_info = None
+        control_entities = {}
+        
+        if device:
+            device_info = {
+                "name": device.name_by_user or device.name,
+                "manufacturer": device.manufacturer,
+                "model": device.model,
+            }
+            _LOGGER.info(
+                "Checking device: %s (manufacturer=%s, model=%s)",
+                device_info["name"],
+                device_info["manufacturer"],
+                device_info["model"],
+            )
 
         device_entities = er.async_entries_for_device(
             entity_registry, device_id, include_disabled_entities=False
@@ -456,6 +565,8 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "solar_power": None,
             "battery_soc": None,
             "house_load": None,
+            "device_info": device_info,
+            "control_entities": control_entities,
         }
 
         for entry in device_entities:
@@ -501,6 +612,20 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         "name": attrs.get("friendly_name", entry.entity_id),
                         "confidence": "medium",
                     }
+
+        # If we have device info, try to detect battery control entities
+        if device and device_info:
+            control_entities = self._detect_battery_control_entities(
+                device, device_entities, entity_registry
+            )
+            candidates["control_entities"] = control_entities
+            
+            if control_entities:
+                _LOGGER.info(
+                    "Detected battery control entities on %s: %s",
+                    device_info["name"],
+                    control_entities,
+                )
 
         return candidates
 
@@ -568,6 +693,152 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             }
 
         return candidates
+
+    def _detect_battery_control_entities(
+        self,
+        device: dr.DeviceEntry,
+        device_entities: list[er.RegistryEntry],
+        entity_registry: er.EntityRegistry,
+    ) -> dict[str, str]:
+        """Detect battery control entities based on device manufacturer/model.
+        
+        Args:
+            device: Device registry entry
+            device_entities: List of entities for this device
+            entity_registry: Entity registry
+            
+        Returns:
+            Dictionary with detected control entities:
+                - battery_mode_select: select entity for battery work mode
+                - battery_charge_power: number entity for charge power
+                - battery_discharge_power: number entity for discharge power
+        """
+        control_entities = {}
+        
+        # Find matching device mapping
+        platform = None
+        for entry in device_entities:
+            if entry.platform:
+                platform = entry.platform
+                break
+        
+        if not platform:
+            _LOGGER.debug("No platform found for device %s", device.name)
+            return control_entities
+        
+        # Check if this device matches any known control mappings
+        mapping = None
+        manufacturer_lower = (device.manufacturer or "").lower()
+        model_lower = (device.model or "").lower()
+        
+        for (map_platform, map_manufacturer, map_model), patterns in DEVICE_CONTROL_MAPPINGS.items():
+            # Check platform match
+            if platform.lower() != map_platform.lower():
+                continue
+            
+            # Check manufacturer match (case-insensitive partial match)
+            if map_manufacturer and map_manufacturer.lower() not in manufacturer_lower:
+                continue
+            
+            # Check model match if specified (case-insensitive partial match)
+            if map_model and map_model.lower() not in model_lower:
+                continue
+            
+            # Found a match!
+            mapping = patterns
+            _LOGGER.info(
+                "Found control mapping for %s %s (platform=%s)",
+                device.manufacturer,
+                device.model,
+                platform,
+            )
+            break
+        
+        if not mapping:
+            _LOGGER.debug(
+                "No control mapping found for platform=%s, manufacturer=%s, model=%s",
+                platform,
+                device.manufacturer,
+                device.model,
+            )
+            return control_entities
+        
+        # Search device entities for control entities using patterns
+        for entry in device_entities:
+            entity_lower = entry.entity_id.lower()
+            
+            # Look for mode select entity
+            if entry.domain == "select" and not control_entities.get(CONF_BATTERY_MODE_SELECT):
+                for pattern in mapping.get("mode_select_patterns", []):
+                    if pattern.lower() in entity_lower:
+                        control_entities[CONF_BATTERY_MODE_SELECT] = entry.entity_id
+                        _LOGGER.info(
+                            "Detected battery mode select: %s (pattern=%s)",
+                            entry.entity_id,
+                            pattern,
+                        )
+                        break
+            
+            # Look for charge power entity
+            if entry.domain == "number" and not control_entities.get(CONF_BATTERY_CHARGE_POWER):
+                for pattern in mapping.get("charge_power_patterns", []):
+                    if pattern.lower() in entity_lower:
+                        control_entities[CONF_BATTERY_CHARGE_POWER] = entry.entity_id
+                        _LOGGER.info(
+                            "Detected battery charge power: %s (pattern=%s)",
+                            entry.entity_id,
+                            pattern,
+                        )
+                        break
+            
+            # Look for discharge power entity
+            if entry.domain == "number" and not control_entities.get(CONF_BATTERY_DISCHARGE_POWER):
+                for pattern in mapping.get("discharge_power_patterns", []):
+                    if pattern.lower() in entity_lower:
+                        control_entities[CONF_BATTERY_DISCHARGE_POWER] = entry.entity_id
+                        _LOGGER.info(
+                            "Detected battery discharge power: %s (pattern=%s)",
+                            entry.entity_id,
+                            pattern,
+                        )
+                        break
+        
+        return control_entities
+
+    async def _check_learned_patterns(self) -> None:
+        """Check if we have learned patterns for this device."""
+        if not self._device_info:
+            return
+        
+        # Initialize learning store if needed
+        if not self._device_learning_store:
+            try:
+                self._device_learning_store = await async_setup_device_learning(self.hass)
+            except Exception as err:
+                _LOGGER.debug("Could not initialize device learning: %s", err)
+                return
+        
+        # Look for learned patterns
+        learned_patterns = self._device_learning_store.get_learned_patterns(self._device_info)
+        if learned_patterns:
+            _LOGGER.info(
+                "Found learned control patterns for %s %s",
+                self._device_info.get("manufacturer"),
+                self._device_info.get("model"),
+            )
+            # Apply learned patterns
+            if learned_patterns.get(CONF_BATTERY_MODE_SELECT):
+                self._detected_entities[CONF_BATTERY_MODE_SELECT] = learned_patterns[
+                    CONF_BATTERY_MODE_SELECT
+                ]
+            if learned_patterns.get(CONF_BATTERY_CHARGE_POWER):
+                self._detected_entities[CONF_BATTERY_CHARGE_POWER] = learned_patterns[
+                    CONF_BATTERY_CHARGE_POWER
+                ]
+            if learned_patterns.get(CONF_BATTERY_DISCHARGE_POWER):
+                self._detected_entities[CONF_BATTERY_DISCHARGE_POWER] = learned_patterns[
+                    CONF_BATTERY_DISCHARGE_POWER
+                ]
 
     async def _get_all_energy_sensors(self) -> dict[str, list[dict[str, Any]]]:
         """Extract ALL sensors from Energy Dashboard with availability status.
