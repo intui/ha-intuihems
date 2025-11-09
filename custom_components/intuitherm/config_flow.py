@@ -67,62 +67,28 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        """Handle the initial step - service connection."""
-        errors: dict[str, str] = {}
-
+        """Handle the initial step - welcome screen."""
+        from .const import VERSION
+        
         if user_input is not None:
-            self._service_url = user_input[CONF_SERVICE_URL].rstrip("/")
-            self._api_key = user_input[CONF_API_KEY]
-            self._update_interval = user_input.get(
-                CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+            # Use hard-coded development values
+            self._service_url = DEFAULT_SERVICE_URL
+            self._api_key = "A6SJ7InZ0cjMMNEP7FS2YOqfr6JMvxZVwbKfPC-dYsk"  # Development API key
+            self._update_interval = DEFAULT_UPDATE_INTERVAL
+            
+            _LOGGER.info(
+                "Starting intuiHEMS setup (version %s) with service at %s",
+                VERSION,
+                self._service_url,
             )
+            # Move directly to auto-detection
+            return await self.async_step_auto_detect()
 
-            # Validate connection to service
-            session = async_get_clientsession(self.hass)
-            try:
-                async with asyncio.timeout(10):
-                    headers = {"Authorization": f"Bearer {self._api_key}"}
-                    url = f"{self._service_url}{ENDPOINT_HEALTH}"
-
-                    async with session.get(url, headers=headers) as response:
-                        if response.status == 200:
-                            _LOGGER.info(
-                                "Successfully connected to IntuiTherm service at %s",
-                                self._service_url,
-                            )
-                            # Connection successful, move to auto-detection
-                            return await self.async_step_auto_detect()
-                        elif response.status == 401:
-                            errors["base"] = "invalid_api_key"
-                        else:
-                            errors["base"] = "cannot_connect"
-
-            except asyncio.TimeoutError:
-                errors["base"] = "timeout_connect"
-            except aiohttp.ClientError:
-                errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-
-        # Show form
+        # Show welcome screen with version
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_SERVICE_URL, default=DEFAULT_SERVICE_URL
-                    ): str,
-                    vol.Required(CONF_API_KEY): str,
-                    vol.Optional(
-                        CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL
-                    ): vol.All(vol.Coerce(int), vol.Range(min=30, max=300)),
-                }
-            ),
-            errors=errors,
-            description_placeholders={
-                "service_url": "Your IntuiTherm service URL (e.g., http://128.140.44.143:80)"
-            },
+            data_schema=vol.Schema({}),
+            description_placeholders={"version": VERSION},
         )
 
     async def async_step_auto_detect(

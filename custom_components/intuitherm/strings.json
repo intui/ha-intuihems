@@ -2,18 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to intuiHEMS",
-        "description": "Enter your intuiHEMS service connection details. The service optimizes your battery charging and discharging schedule using Model Predictive Control.",
-        "data": {
-          "service_url": "Service URL",
-          "api_key": "API Key",
-          "update_interval": "Update Interval (seconds)"
-        },
-        "data_description": {
-          "service_url": "URL of your IntuiTherm service (e.g., http://128.140.44.143:80)",
-          "api_key": "Bearer token for API authentication",
-          "update_interval": "How often to poll the service for updates (30-300 seconds)"
-        }
+        "title": "Welcome to intuiHEMS",
+        "description": "Version {version}\n\nThis wizard will help you set up your battery optimizer. We'll automatically detect your battery, solar, and house load sensors from the Home Assistant Energy Dashboard.\n\nClick Submit to continue."
       },
       "auto_detect": {
         "title": "Auto-Detect Energy Sensors",
