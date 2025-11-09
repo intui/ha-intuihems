@@ -1,6 +1,6 @@
 {
   "domain": "intuitherm",
-  "name": "intuiHEMS Battery Optimizer",
+  "name": "intuiHEMS",
   "codeowners": ["@intui"],
   "config_flow": true,
   "dependencies": [],

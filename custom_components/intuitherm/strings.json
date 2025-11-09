@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Connect to IntuiTherm Service",
-        "description": "Enter your IntuiTherm service connection details. The service optimizes your battery charging and discharging schedule using Model Predictive Control.",
+        "title": "Connect to intuiHEMS",
+        "description": "Enter your intuiHEMS service connection details. The service optimizes your battery charging and discharging schedule using Model Predictive Control.",
         "data": {
           "service_url": "Service URL",
           "api_key": "API Key",
