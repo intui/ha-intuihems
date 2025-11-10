@@ -281,7 +281,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Create config entry
             return self.async_create_entry(
-                title="IntuiTherm Battery Optimizer",
+                title="intuiHEMS",
                 data={
                     CONF_SERVICE_URL: self._service_url,
                     CONF_API_KEY: self._api_key,
@@ -289,6 +289,10 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_DETECTED_ENTITIES: self._detected_entities,
                 },
             )
+        
+        # If no user input yet, show the review form
+        # Get all available sensors for dropdowns
+        entity_registry = er.async_get(self.hass)
 
     async def _save_learned_device(self, control_entities: dict[str, str]) -> None:
         """Save learned device configuration.
@@ -335,8 +339,11 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 share_with_community=True,  # User can opt-out in settings later
             )
 
-        # Get all available sensors for dropdowns
-        entity_registry = er.async_get(self.hass)        # Battery SOC sensors (device_class=battery, unit=%)
+    async def _show_review_form(self) -> config_entries.FlowResult:
+        """Show the review form with sensor selection."""
+        entity_registry = er.async_get(self.hass)
+        
+        # Battery SOC sensors (device_class=battery, unit=%)
         soc_entities = {
             entry.entity_id: f"{entry.entity_id} ({entry.original_name or entry.entity_id})"
             for entry in entity_registry.entities.values()
@@ -349,7 +356,6 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         }
 
         # Power/Energy sensors (device_class=power OR energy, units kW/W/kWh/Wh)
-        # Include both instantaneous power (kW) and cumulative energy (kWh) sensors
         power_entities = {}
         for entry in entity_registry.entities.values():
             if entry.domain != "sensor" or entry.disabled_by:
@@ -357,11 +363,9 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             state = self.hass.states.get(entry.entity_id)
             if not state:
                 continue
-            # Include power sensors (kW/W) and energy sensors (kWh/Wh)
             unit = state.attributes.get("unit_of_measurement", "").lower()
             device_class = entry.device_class
             if device_class in ["power", "energy"] or unit in ["kw", "w", "kwh", "wh"]:
-                # Add unit indicator to help users distinguish
                 unit_display = state.attributes.get("unit_of_measurement", "")
                 power_entities[entry.entity_id] = (
                     f"{entry.entity_id} [{unit_display}] ({entry.original_name or entry.entity_id})"
@@ -373,26 +377,20 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if soc_entities:
             default_soc = self._detected_entities.get(CONF_BATTERY_SOC_ENTITY)
             if default_soc and default_soc in soc_entities:
-                schema[vol.Required(CONF_BATTERY_SOC_ENTITY, default=default_soc)] = (
-                    vol.In(soc_entities)
-                )
+                schema[vol.Required(CONF_BATTERY_SOC_ENTITY, default=default_soc)] = vol.In(soc_entities)
             else:
                 schema[vol.Optional(CONF_BATTERY_SOC_ENTITY)] = vol.In(soc_entities)
 
         if power_entities:
             default_solar = self._detected_entities.get(CONF_SOLAR_POWER_ENTITY)
             if default_solar and default_solar in power_entities:
-                schema[
-                    vol.Optional(CONF_SOLAR_POWER_ENTITY, default=default_solar)
-                ] = vol.In(power_entities)
+                schema[vol.Optional(CONF_SOLAR_POWER_ENTITY, default=default_solar)] = vol.In(power_entities)
             else:
                 schema[vol.Optional(CONF_SOLAR_POWER_ENTITY)] = vol.In(power_entities)
 
             default_load = self._detected_entities.get(CONF_HOUSE_LOAD_ENTITY)
             if default_load and default_load in power_entities:
-                schema[vol.Optional(CONF_HOUSE_LOAD_ENTITY, default=default_load)] = (
-                    vol.In(power_entities)
-                )
+                schema[vol.Optional(CONF_HOUSE_LOAD_ENTITY, default=default_load)] = vol.In(power_entities)
             else:
                 schema[vol.Optional(CONF_HOUSE_LOAD_ENTITY)] = vol.In(power_entities)
 
@@ -405,7 +403,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="review",
             data_schema=vol.Schema(schema),
-            errors=errors,
+            errors={},
             description_placeholders=description_placeholders,
         )
 
