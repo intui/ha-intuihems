@@ -60,12 +60,12 @@ class IntuiThermAutoControlSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if automatic control is enabled."""
-        if not self.coordinator.data:
+        if not self.coordinator.data or self.coordinator.data is None:
             return False
 
-        control_data = self.coordinator.data.get("control", {})
-
-        if isinstance(control_data, Exception):
+        control_data = self.coordinator.data.get("control") if isinstance(self.coordinator.data, dict) else None
+        
+        if not control_data or isinstance(control_data, Exception):
             return False
 
         return control_data.get("automatic_control_enabled", False)

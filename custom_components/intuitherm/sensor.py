@@ -162,9 +162,9 @@ class IntuiThermOptimizationStatusSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return None
 
-        control_data = self.coordinator.data.get("control", {})
+        control_data = self.coordinator.data.get("control") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(control_data, Exception):
+        if not control_data or isinstance(control_data, Exception):
             return "unknown"
 
         return "enabled" if control_data.get("automatic_control_enabled") else "disabled"
@@ -175,9 +175,9 @@ class IntuiThermOptimizationStatusSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return {}
 
-        control_data = self.coordinator.data.get("control", {})
+        control_data = self.coordinator.data.get("control") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(control_data, Exception):
+        if not control_data or isinstance(control_data, Exception):
             return {"error": str(control_data)}
 
         attrs = {}
@@ -212,9 +212,9 @@ class IntuiThermControlModeSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return None
 
-        control_data = self.coordinator.data.get("control", {})
+        control_data = self.coordinator.data.get("control") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(control_data, Exception):
+        if not control_data or isinstance(control_data, Exception):
             return "unknown"
 
         mode = control_data.get("current_mode", "unknown")
@@ -236,9 +236,9 @@ class IntuiThermControlModeSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return {}
 
-        control_data = self.coordinator.data.get("control", {})
+        control_data = self.coordinator.data.get("control") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(control_data, Exception):
+        if not control_data or isinstance(control_data, Exception):
             return {"error": str(control_data)}
 
         attrs = {}
@@ -285,9 +285,9 @@ class IntuiThermMPCSuccessRateSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return None
 
-        metrics_data = self.coordinator.data.get("metrics", {})
+        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(metrics_data, Exception):
+        if not metrics_data or isinstance(metrics_data, Exception):
             return None
 
         # Calculate success rate from metrics
@@ -305,9 +305,9 @@ class IntuiThermMPCSuccessRateSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return {}
 
-        metrics_data = self.coordinator.data.get("metrics", {})
+        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(metrics_data, Exception):
+        if not metrics_data or isinstance(metrics_data, Exception):
             return {"error": str(metrics_data)}
 
         attrs = {}
@@ -347,9 +347,9 @@ class IntuiThermMPCSolveTimeSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return None
 
-        metrics_data = self.coordinator.data.get("metrics", {})
+        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(metrics_data, Exception):
+        if not metrics_data or isinstance(metrics_data, Exception):
             return None
 
         # Get average solve time
@@ -366,9 +366,9 @@ class IntuiThermMPCSolveTimeSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return {}
 
-        metrics_data = self.coordinator.data.get("metrics", {})
+        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(metrics_data, Exception):
+        if not metrics_data or isinstance(metrics_data, Exception):
             return {"error": str(metrics_data)}
 
         attrs = {}
@@ -401,16 +401,16 @@ class IntuiThermMPCRuns24hSensor(IntuiThermSensorBase):
 
     @property
     def native_value(self) -> int | None:
-        """Return the state of the sensor."""
-        if not self.coordinator.data:
+        """Return number of MPC runs in the last 24 hours."""
+        if not self.coordinator.data or self.coordinator.data is None:
             return None
 
         # Note: This sensor will show the 1-hour count from the metrics endpoint
         # In a future enhancement, we could query /api/v1/metrics?period_hours=24
         # separately to get true 24h counts
-        metrics_data = self.coordinator.data.get("metrics", {})
+        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(metrics_data, Exception):
+        if not metrics_data or isinstance(metrics_data, Exception):
             return None
 
         total_runs = metrics_data.get("mpc_total_runs")
@@ -426,9 +426,9 @@ class IntuiThermMPCRuns24hSensor(IntuiThermSensorBase):
         if not self.coordinator.data:
             return {}
 
-        metrics_data = self.coordinator.data.get("metrics", {})
+        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
 
-        if isinstance(metrics_data, Exception):
+        if not metrics_data or isinstance(metrics_data, Exception):
             return {"error": str(metrics_data)}
 
         attrs = {}
