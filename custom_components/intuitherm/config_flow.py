@@ -290,9 +290,8 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
         
-        # If no user input yet, show the review form
-        # Get all available sensors for dropdowns
-        entity_registry = er.async_get(self.hass)
+        # If no user input yet, show the review form with available sensors
+        return await self._show_review_form()
 
     async def _save_learned_device(self, control_entities: dict[str, str]) -> None:
         """Save learned device configuration.
