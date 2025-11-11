@@ -26,6 +26,8 @@ from .const import (
     CONF_GRID_IMPORT_SENSORS,
     CONF_GRID_EXPORT_SENSORS,
     CONF_BATTERY_SOC_ENTITY,
+    CONF_SOLAR_POWER_ENTITY,
+    CONF_DETECTED_ENTITIES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,8 +78,9 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             
             # Backfill historic data on first run
             if not self._historic_data_sent and self.entry:
-                await self._backfill_historic_data()
-                self._historic_data_sent = True
+                success = await self._backfill_historic_data()
+                if success:
+                    self._historic_data_sent = True
 
             # Send sensor readings
             if self.entry:
@@ -295,8 +298,12 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                     except Exception as err:
                         _LOGGER.debug("Failed to send reading for %s: %s", entity_id, err)
 
-    async def _backfill_historic_data(self) -> None:
-        """Backfill up to 7 days of historic sensor data on first run."""
+    async def _backfill_historic_data(self) -> bool:
+        """Backfill up to 7 days of historic sensor data on first run.
+        
+        Returns:
+            True if backfill succeeded, False otherwise
+        """
         from homeassistant.components.recorder import get_instance
         from homeassistant.components.recorder.history import state_changes_during_period
         
@@ -307,9 +314,13 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             recorder = get_instance(self.hass)
             if not recorder:
                 _LOGGER.warning("Recorder not available, skipping historic backfill")
-                return
+                return False
             
             config = {**self.entry.data, **self.entry.options}
+            
+            # Extract detected_entities dict if present (new config flow format)
+            # This dict is nested inside config, not merged at top level
+            detected_entities = config.get(CONF_DETECTED_ENTITIES, {})
             
             # Calculate time range (7 days back)
             end_time = datetime.now(timezone.utc)
@@ -318,29 +329,33 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             # Collect all entity IDs to backfill
             entities_to_backfill = []
             
-            # Solar sensors
-            for sensor_id in config.get(CONF_SOLAR_SENSORS, []):
-                entities_to_backfill.append((sensor_id, "solar"))
+            # Solar sensors (new format: inside detected_entities dict)
+            solar_entity = detected_entities.get(CONF_SOLAR_POWER_ENTITY) if isinstance(detected_entities, dict) else None
+            if solar_entity:
+                entities_to_backfill.append((solar_entity, "solar"))
+                _LOGGER.debug("Backfill: Found solar sensor: %s", solar_entity)
             
-            # Battery SoC
-            if battery_soc := config.get(CONF_BATTERY_SOC_ENTITY):
+            # Battery SoC (inside detected_entities dict)
+            battery_soc = detected_entities.get(CONF_BATTERY_SOC_ENTITY) if isinstance(detected_entities, dict) else None
+            if battery_soc:
                 entities_to_backfill.append((battery_soc, "soc"))
+                _LOGGER.debug("Backfill: Found battery SoC sensor: %s", battery_soc)
             
-            # Battery charge/discharge
-            for sensor_id in config.get(CONF_BATTERY_CHARGE_SENSORS, []):
-                entities_to_backfill.append((sensor_id, "soc"))
-            for sensor_id in config.get(CONF_BATTERY_DISCHARGE_SENSORS, []):
-                entities_to_backfill.append((sensor_id, "soc"))
+            # Grid import (inside detected_entities dict, with custom key name)
+            grid_import = detected_entities.get("grid_import_sensor") if isinstance(detected_entities, dict) else None
+            if grid_import:
+                entities_to_backfill.append((grid_import, "load"))
+                _LOGGER.debug("Backfill: Found grid import sensor: %s", grid_import)
             
-            # Grid import/export  
-            for sensor_id in config.get(CONF_GRID_IMPORT_SENSORS, []):
-                entities_to_backfill.append((sensor_id, "load"))
-            for sensor_id in config.get(CONF_GRID_EXPORT_SENSORS, []):
-                entities_to_backfill.append((sensor_id, "load"))
+            # Grid export (inside detected_entities dict, with custom key name)
+            grid_export = detected_entities.get("grid_export_sensor") if isinstance(detected_entities, dict) else None
+            if grid_export:
+                entities_to_backfill.append((grid_export, "load"))
+                _LOGGER.debug("Backfill: Found grid export sensor: %s", grid_export)
             
             if not entities_to_backfill:
-                _LOGGER.warning("No entities configured for backfill")
-                return
+                _LOGGER.info("No entities configured for historic backfill")
+                return False
             
             _LOGGER.info(
                 "Backfilling %d sensors from %s to %s",
@@ -352,21 +367,24 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             # Query historic data for all entities
             entity_ids = [entity_id for entity_id, _ in entities_to_backfill]
             
-            history_data = await recorder.async_add_executor_job(
-                state_changes_during_period,
-                self.hass,
-                start_time,
-                end_time,
-                None,  # entity_id filter
-                False,  # no_attributes
-                False,  # descending
-                False,  # limit
-                entity_ids
-            )
+            _LOGGER.debug("Querying historic data for entities: %s", entity_ids)
+            
+            # Query each entity separately (state_changes_during_period doesn't accept list)
+            history_data = {}
+            for entity_id in entity_ids:
+                entity_history = await recorder.async_add_executor_job(
+                    state_changes_during_period,
+                    self.hass,
+                    start_time,
+                    end_time,
+                    entity_id,  # Single entity_id as string
+                )
+                if entity_history and entity_id in entity_history:
+                    history_data[entity_id] = entity_history[entity_id]
             
             if not history_data:
                 _LOGGER.warning("No historic data found for sensors")
-                return
+                return False
             
             # Create entity_id to sensor_type mapping
             sensor_type_map = {entity_id: sensor_type for entity_id, sensor_type in entities_to_backfill}
@@ -396,8 +414,8 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                 if not readings:
                     continue
                 
-                # Send in batches of 500 to avoid overloading the API
-                batch_size = 500
+                # Send in batches of 100 (API max_items limit)
+                batch_size = 100
                 for i in range(0, len(readings), batch_size):
                     batch = readings[i:i + batch_size]
                     try:
@@ -428,7 +446,9 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                 total_readings,
                 len(history_data)
             )
+            return True
             
         except Exception as err:
             _LOGGER.error("Historic backfill failed: %s", err, exc_info=True)
             # Don't raise - backfill failure shouldn't prevent integration from working
+            return False
