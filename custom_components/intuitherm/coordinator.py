@@ -86,16 +86,29 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             if self.entry:
                 await self._send_sensor_readings()
 
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(15):
                 # Fetch all endpoints in parallel for efficiency
                 health_task = self._fetch_json(ENDPOINT_HEALTH)
                 status_task = self._fetch_json(ENDPOINT_CONTROL_STATUS)
                 metrics_task = self._fetch_json(ENDPOINT_METRICS, params={"period_hours": 1})
+                
+                # Fetch forecast data
+                consumption_forecast_task = self._fetch_json("/api/v1/forecasts/consumption")
+                solar_forecast_task = self._fetch_json("/api/v1/forecasts/solar")
+                battery_soc_plan_task = self._fetch_json("/api/v1/forecasts/battery_soc")
+                control_plan_task = self._fetch_json("/api/v1/forecasts/control_plan")
+                price_forecast_task = self._fetch_json("/api/v1/forecasts/prices")
 
-                health, status, metrics = await asyncio.gather(
+                health, status, metrics, consumption_forecast, solar_forecast, \
+                battery_soc_plan, control_plan, price_forecast = await asyncio.gather(
                     health_task,
                     status_task,
                     metrics_task,
+                    consumption_forecast_task,
+                    solar_forecast_task,
+                    battery_soc_plan_task,
+                    control_plan_task,
+                    price_forecast_task,
                     return_exceptions=True,
                 )
 
@@ -121,6 +134,18 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                 data["metrics"] = None
             else:
                 data["metrics"] = metrics
+                
+            # Add forecast data
+            data["consumption_forecast"] = consumption_forecast if not isinstance(consumption_forecast, Exception) else None
+            data["solar_forecast"] = solar_forecast if not isinstance(solar_forecast, Exception) else None
+            data["battery_soc_plan"] = battery_soc_plan if not isinstance(battery_soc_plan, Exception) else None
+            data["control_plan"] = control_plan if not isinstance(control_plan, Exception) else None
+            data["price_forecast"] = price_forecast if not isinstance(price_forecast, Exception) else None
+            
+            if isinstance(consumption_forecast, Exception):
+                _LOGGER.debug("No consumption forecast available yet: %s", consumption_forecast)
+            if isinstance(solar_forecast, Exception):
+                _LOGGER.debug("No solar forecast available yet: %s", solar_forecast)
 
             _LOGGER.debug("Data fetch complete")
             return data

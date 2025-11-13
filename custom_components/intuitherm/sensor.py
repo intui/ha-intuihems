@@ -51,6 +51,7 @@ async def async_setup_entry(
     ]
 
     sensors = [
+        # Status sensors
         IntuiThermServiceHealthSensor(coordinator, entry),
         IntuiThermOptimizationStatusSensor(coordinator, entry),
         IntuiThermControlModeSensor(coordinator, entry),
@@ -58,6 +59,12 @@ async def async_setup_entry(
         IntuiThermMPCSolveTimeSensor(coordinator, entry),
         IntuiThermMPCRuns24hSensor(coordinator, entry),
         IntuiThermDryRunModeSensor(coordinator, entry),
+        # Forecast sensors
+        IntuiThermConsumptionForecastSensor(coordinator, entry),
+        IntuiThermSolarForecastSensor(coordinator, entry),
+        IntuiThermBatterySOCPlanSensor(coordinator, entry),
+        IntuiThermNextControlSensor(coordinator, entry),
+        IntuiThermPredictedCostSensor(coordinator, entry),
     ]
 
     async_add_entities(sensors)
@@ -500,3 +507,291 @@ class IntuiThermDryRunModeSensor(IntuiThermSensorBase):
             attrs["warning"] = "Battery is NOT being controlled - for testing only"
         
         return attrs
+
+
+# Forecast Sensors
+
+class IntuiThermConsumptionForecastSensor(IntuiThermSensorBase):
+    """Sensor showing consumption forecast with historical data."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            "consumption_forecast",
+            "IntuiTherm Consumption Forecast",
+            "mdi:home-lightning-bolt",
+        )
+        self._attr_device_class = SensorDeviceClass.POWER
+        self._attr_native_unit_of_measurement = "kW"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def native_value(self) -> float | None:
+        """Return mean forecast value."""
+        if not self.coordinator.data:
+            return None
+
+        forecast_data = self.coordinator.data.get("consumption_forecast")
+        if not forecast_data or isinstance(forecast_data, Exception):
+            return None
+
+        return forecast_data.get("mean_forecast")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return forecast points as attributes for ApexCharts."""
+        if not self.coordinator.data:
+            return {}
+
+        forecast_data = self.coordinator.data.get("consumption_forecast")
+        if not forecast_data or isinstance(forecast_data, Exception):
+            return {"error": str(forecast_data) if isinstance(forecast_data, Exception) else "No data"}
+
+        return {
+            "forecast": forecast_data.get("forecast", []),
+            "historical": forecast_data.get("historical", []),
+            "generated_at": forecast_data.get("generated_at"),
+            "forecast_method": forecast_data.get("forecast_method"),
+            "unit": "kW",
+        }
+
+
+class IntuiThermSolarForecastSensor(IntuiThermSensorBase):
+    """Sensor showing solar generation forecast."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            "solar_forecast",
+            "IntuiTherm Solar Forecast",
+            "mdi:solar-power",
+        )
+        self._attr_device_class = SensorDeviceClass.POWER
+        self._attr_native_unit_of_measurement = "kW"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def native_value(self) -> float | None:
+        """Return mean forecast value."""
+        if not self.coordinator.data:
+            return None
+
+        forecast_data = self.coordinator.data.get("solar_forecast")
+        if not forecast_data or isinstance(forecast_data, Exception):
+            return None
+
+        return forecast_data.get("mean_forecast")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return forecast points as attributes."""
+        if not self.coordinator.data:
+            return {}
+
+        forecast_data = self.coordinator.data.get("solar_forecast")
+        if not forecast_data or isinstance(forecast_data, Exception):
+            return {"error": str(forecast_data) if isinstance(forecast_data, Exception) else "No data"}
+
+        return {
+            "forecast": forecast_data.get("forecast", []),
+            "historical": forecast_data.get("historical", []),
+            "generated_at": forecast_data.get("generated_at"),
+            "forecast_method": forecast_data.get("forecast_method"),
+            "unit": "kW",
+        }
+
+
+class IntuiThermBatterySOCPlanSensor(IntuiThermSensorBase):
+    """Sensor showing planned battery SOC trajectory."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            "battery_soc_plan",
+            "IntuiTherm Battery SOC Plan",
+            "mdi:battery-charging",
+        )
+        self._attr_device_class = SensorDeviceClass.BATTERY
+        self._attr_native_unit_of_measurement = PERCENTAGE
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+    @property
+    def native_value(self) -> float | None:
+        """Return current SOC."""
+        if not self.coordinator.data:
+            return None
+
+        soc_data = self.coordinator.data.get("battery_soc_plan")
+        if not soc_data or isinstance(soc_data, Exception):
+            return None
+
+        return soc_data.get("current_soc")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return planned SOC trajectory."""
+        if not self.coordinator.data:
+            return {}
+
+        soc_data = self.coordinator.data.get("battery_soc_plan")
+        if not soc_data or isinstance(soc_data, Exception):
+            return {"error": str(soc_data) if isinstance(soc_data, Exception) else "No data"}
+
+        return {
+            "planned_soc": soc_data.get("planned_soc", []),
+            "generated_at": soc_data.get("generated_at"),
+            "unit": "%",
+        }
+
+
+class IntuiThermNextControlSensor(IntuiThermSensorBase):
+    """Sensor showing next control decision."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            "next_control",
+            "IntuiTherm Next Control",
+            "mdi:chart-timeline-variant",
+        )
+
+    @property
+    def native_value(self) -> str | None:
+        """Return next control decision as text."""
+        if not self.coordinator.data:
+            return None
+
+        control_data = self.coordinator.data.get("control_plan")
+        if not control_data or isinstance(control_data, Exception):
+            return "No plan available"
+
+        next_control = control_data.get("next_control")
+        if not next_control:
+            return "No upcoming control"
+
+        mode = next_control.get("mode", "unknown")
+        power = next_control.get("power_kw", 0)
+        timestamp = next_control.get("timestamp")
+
+        # Format mode name
+        mode_names = {
+            "force_charge": "Charge",
+            "self_use": "Self Use",
+            "backup": "Preserve"
+        }
+        mode_str = mode_names.get(mode, mode)
+
+        if timestamp:
+            try:
+                ts = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                time_str = ts.strftime("%H:%M")
+                return f"{mode_str} @ {time_str}"
+            except:
+                pass
+
+        return f"{mode_str} ({power:.1f}kW)"
+
+    @property
+    def icon(self) -> str:
+        """Return dynamic icon based on mode."""
+        if not self.coordinator.data:
+            return "mdi:battery-unknown"
+
+        control_data = self.coordinator.data.get("control_plan")
+        if not control_data or isinstance(control_data, Exception):
+            return "mdi:battery-unknown"
+
+        next_control = control_data.get("next_control")
+        if not next_control:
+            return "mdi:battery"
+
+        mode = next_control.get("mode", "")
+        icons = {
+            "force_charge": "mdi:battery-charging",
+            "self_use": "mdi:battery-sync",
+            "backup": "mdi:battery-lock"
+        }
+        return icons.get(mode, "mdi:battery")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return control plan details."""
+        if not self.coordinator.data:
+            return {}
+
+        control_data = self.coordinator.data.get("control_plan")
+        if not control_data or isinstance(control_data, Exception):
+            return {"error": str(control_data) if isinstance(control_data, Exception) else "No data"}
+
+        next_control = control_data.get("next_control", {})
+        
+        attrs = {
+            "controls": control_data.get("controls", []),
+            "generated_at": control_data.get("generated_at"),
+            "optimization_cost_eur": control_data.get("optimization_cost_eur"),
+        }
+
+        if next_control:
+            attrs.update({
+                "next_mode": next_control.get("mode"),
+                "next_power_kw": next_control.get("power_kw"),
+                "next_timestamp": next_control.get("timestamp"),
+                "next_expected_soc": next_control.get("expected_soc"),
+            })
+
+        return attrs
+
+
+class IntuiThermPredictedCostSensor(IntuiThermSensorBase):
+    """Sensor showing predicted electricity cost for next 24h."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            "predicted_cost",
+            "IntuiTherm Predicted Cost (24h)",
+            "mdi:currency-eur",
+        )
+        self._attr_native_unit_of_measurement = "EUR"
+        self._attr_state_class = SensorStateClass.TOTAL
+
+    @property
+    def native_value(self) -> float | None:
+        """Return predicted cost from latest MPC run."""
+        if not self.coordinator.data:
+            return None
+
+        control_data = self.coordinator.data.get("control_plan")
+        if not control_data or isinstance(control_data, Exception):
+            return None
+
+        return control_data.get("optimization_cost_eur")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return price forecast data."""
+        if not self.coordinator.data:
+            return {}
+
+        price_data = self.coordinator.data.get("price_forecast")
+        if not price_data or isinstance(price_data, Exception):
+            return {}
+
+        return {
+            "prices": price_data.get("prices", []),
+            "current_price": price_data.get("current_price"),
+            "mean_price": price_data.get("mean_price"),
+            "min_price": price_data.get("min_price"),
+            "max_price": price_data.get("max_price"),
+            "unit": "EUR/kWh",
+        }
