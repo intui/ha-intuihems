@@ -154,3 +154,4 @@ The forecast sensors lay the groundwork for:
 - Documentation: https://github.com/intui/intuiHEMS
 - Report bugs: https://github.com/intui/intuiHEMS/issues
 - Discussion: https://github.com/intui/intuiHEMS/discussions
+
