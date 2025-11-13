@@ -13,6 +13,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Local compute mode (optional offline operation)
 - Email notifications for important events
 
+## [2025.11.13.1] - 2025-11-13
+
+### Added
+- **5 New Forecast Sensors**: Real-time visualization of 24-hour predictions
+  - `sensor.intuihems_consumption_forecast` - House consumption forecast (kW)
+  - `sensor.intuihems_solar_forecast` - Solar production forecast (kW)
+  - `sensor.intuihems_battery_soc_forecast` - Battery state of charge forecast (%)
+  - `sensor.intuihems_grid_import_forecast` - Predicted grid imports (kW)
+  - `sensor.intuihems_grid_export_forecast` - Predicted grid exports (kW)
+  - Each sensor provides 96 data points (15-min intervals, 24 hours)
+  - Compatible with ApexCharts card for rich dashboard visualizations
+
+- **Battery Charge/Discharge Sensors**: Added to setup flow
+  - Battery charge sensor (energy going INTO battery)
+  - Battery discharge sensor (energy coming OUT of battery)
+  - Critical for accurate house load calculation
+  - See `docs/HOUSE_LOAD_CALCULATION.md` for details
+
+- **Documentation**:
+  - `HOUSE_LOAD_CALCULATION.md` - Explains power balance equation and sensor requirements
+  - Dashboard YAML examples for forecast visualization
+
+### Changed
+- **HTTPS Domain**: Default service URL changed from IP to `https://api.intuihems.de`
+  - SSL/TLS encryption for all API communication
+  - More reliable (survives server IP changes)
+  - Professional domain with Let's Encrypt certificates
+
+- **Improved Sensor Selection**: All sensors now use dropdown selectors
+  - Consistent UX across all sensor selections
+  - Battery charge/discharge now included in review screen
+  - Custom entity ID entry option for all sensors
+
+### Technical
+- Backend deployed with Traefik reverse proxy
+- SSL certificates auto-renewed via Let's Encrypt
+- GitHub redirects configured (www.intuihems.de → repository)
+- Migration chain fixed for production database
+
 ## [0.1.1] - 2025-11-06
 
 ### Added
