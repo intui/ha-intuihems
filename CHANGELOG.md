@@ -251,3 +251,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Issue Tracker](https://github.com/intui/intuitherm/issues)
 - [Cloud Service](https://api.intuihems.io)
 - [Privacy Policy](https://api.intuihems.io/api/v1/gdpr/privacy)
+# Trigger workflow
