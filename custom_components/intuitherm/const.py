@@ -67,6 +67,7 @@ SERVICE_DISABLE_AUTO: Final = "disable_automatic_control"
 
 # Coordinator data keys
 DATA_COORDINATOR: Final = "coordinator"
+DATA_BATTERY_CONTROL: Final = "battery_control"
 DATA_UNSUB: Final = "unsub"
 
 # Sensor types

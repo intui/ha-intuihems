@@ -15,12 +15,17 @@ from .const import (
     CONF_SERVICE_URL,
     CONF_API_KEY,
     CONF_UPDATE_INTERVAL,
+    CONF_BATTERY_MODE_SELECT,
+    CONF_BATTERY_CHARGE_POWER,
+    CONF_BATTERY_DISCHARGE_POWER,
     DATA_COORDINATOR,
+    DATA_BATTERY_CONTROL,
     DATA_UNSUB,
     DEFAULT_UPDATE_INTERVAL,
     VERSION,
 )
 from .coordinator import IntuiThermCoordinator
+from .battery_control import BatteryControlExecutor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,6 +72,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         DATA_UNSUB: [],
     }
 
+    # Initialize battery control executor if battery entities are configured
+    battery_executor = None
+    if all([
+        config.get(CONF_BATTERY_MODE_SELECT),
+        config.get(CONF_BATTERY_CHARGE_POWER),
+        config.get(CONF_BATTERY_DISCHARGE_POWER),
+    ]):
+        _LOGGER.info("Battery control entities configured, initializing executor")
+        battery_executor = BatteryControlExecutor(
+            hass=hass,
+            coordinator=coordinator,
+            config=config,
+        )
+        hass.data[DOMAIN][entry.entry_id][DATA_BATTERY_CONTROL] = battery_executor
+        
+        # Start the executor
+        battery_executor.start()
+        _LOGGER.info("Battery control executor started")
+    else:
+        _LOGGER.info("Battery control entities not configured, executor disabled")
+
     # Forward entry setup to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -90,16 +116,19 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     _LOGGER.info("Unloading IntuiTherm integration")
 
+    # Stop battery control executor if running
+    entry_data = hass.data[DOMAIN].get(entry.entry_id, {})
+    battery_executor = entry_data.get(DATA_BATTERY_CONTROL)
+    if battery_executor:
+        _LOGGER.info("Stopping battery control executor")
+        battery_executor.stop()
+
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
     if unload_ok:
         # Remove config entry from domain
-        entry_data = hass.data[DOMAIN].pop(entry.entry_id)
-
-        # Cancel any subscriptions
-        for unsub in entry_data[DATA_UNSUB]:
-            unsub()
+        hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
 

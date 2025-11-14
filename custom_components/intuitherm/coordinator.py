@@ -96,7 +96,7 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                 consumption_forecast_task = self._fetch_json("/api/v1/forecasts/consumption")
                 solar_forecast_task = self._fetch_json("/api/v1/forecasts/solar")
                 battery_soc_plan_task = self._fetch_json("/api/v1/forecasts/battery_soc")
-                control_plan_task = self._fetch_json("/api/v1/forecasts/control_plan")
+                control_plan_task = self._fetch_json("/api/v1/control/plan")  # Pull-based control plan
                 price_forecast_task = self._fetch_json("/api/v1/forecasts/prices")
 
                 health, status, metrics, consumption_forecast, solar_forecast, \
