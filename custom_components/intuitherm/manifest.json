@@ -9,5 +9,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/intui/intuiHEMS/issues",
   "requirements": ["aiohttp>=3.9.0"],
-  "version": "2025.11.15.2"
+  "version": "2025.11.15.3"
 }

@@ -193,7 +193,12 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if ha_version:
                     registration_data["ha_version"] = ha_version
                 
-                _LOGGER.debug("Registration payload: %s", {k: v for k, v in registration_data.items() if k != "installation_id"})
+                _LOGGER.info("Registration payload:")
+                for key, value in registration_data.items():
+                    if key == "installation_id":
+                        _LOGGER.info("  %s: %s", key, value[:8] + "..." if len(value) > 8 else value)
+                    else:
+                        _LOGGER.info("  %s: %s", key, value)
                 
                 async with asyncio.timeout(15):
                     async with session.post(
