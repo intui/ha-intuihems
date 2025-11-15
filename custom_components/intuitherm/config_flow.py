@@ -228,15 +228,15 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             return await self.async_step_auto_detect()
                             
                         elif resp.status == 409:
-                            # Already registered
-                            _LOGGER.warning("Installation already registered")
+                            # Already registered - backend will deactivate old user and allow re-registration
+                            # This shouldn't happen anymore with the new backend logic, but handle it gracefully
+                            _LOGGER.warning("Installation already registered (unexpected 409), retrying registration")
                             try:
                                 error_data = await resp.json()
-                                registered_at = error_data.get("detail", {}).get("registered_at", "unknown")
-                                _LOGGER.info("Previously registered at: %s", registered_at)
+                                _LOGGER.info("Registration conflict details: %s", error_data)
                             except:
                                 pass
-                            errors["base"] = "already_registered"
+                            errors["base"] = "registration_failed"
                             
                         elif resp.status == 503:
                             # Service unavailable (alpha limit)
@@ -260,7 +260,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Registration error: %s", err)
                 errors["base"] = "registration_failed"
         
-        # Show error form if registration failed
+        # Show error form if registration failed (but not for 409, which redirects)
         return self.async_show_form(
             step_id="register",
             data_schema=vol.Schema({}),
