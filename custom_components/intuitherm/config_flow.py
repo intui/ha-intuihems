@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone as dt_timezone
 from typing import Any
 
 import aiohttp
@@ -221,7 +222,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             # Store for later
                             self._detected_entities[CONF_INSTANCE_ID] = ha_instance_id
                             self._detected_entities[CONF_USER_ID] = user_id
-                            self._detected_entities[CONF_REGISTERED_AT] = datetime.now(timezone.utc).isoformat()
+                            self._detected_entities[CONF_REGISTERED_AT] = datetime.now(dt_timezone.utc).isoformat()
                             
                             # Move to auto-detection
                             return await self.async_step_auto_detect()
