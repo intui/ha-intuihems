@@ -712,10 +712,11 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # Store the final selected sensors
                 self._detected_entities[CONF_SOLAR_POWER_ENTITY] = solar_production
                 self._detected_entities[CONF_BATTERY_SOC_ENTITY] = battery_soc
-                self._detected_entities["battery_charge_sensor"] = battery_charge
-                self._detected_entities["battery_discharge_sensor"] = battery_discharge
-                self._detected_entities["grid_import_sensor"] = grid_import
-                self._detected_entities["grid_export_sensor"] = grid_export
+                # Store as lists for coordinator compatibility
+                self._detected_entities[CONF_BATTERY_CHARGE_SENSORS] = [battery_charge] if battery_charge else []
+                self._detected_entities[CONF_BATTERY_DISCHARGE_SENSORS] = [battery_discharge] if battery_discharge else []
+                self._detected_entities[CONF_GRID_IMPORT_SENSORS] = [grid_import] if grid_import else []
+                self._detected_entities[CONF_GRID_EXPORT_SENSORS] = [grid_export] if grid_export else []
                 
                 # Proceed to pricing configuration
                 return await self.async_step_pricing()

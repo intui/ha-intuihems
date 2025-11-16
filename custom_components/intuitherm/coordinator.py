@@ -69,25 +69,32 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from IntuiTherm service."""
-        _LOGGER.debug("Fetching data from IntuiTherm service")
+        _LOGGER.info("🔄 Coordinator update cycle started")
 
         try:
             # Register sensors on first run
             if not self._sensors_registered and self.entry:
+                _LOGGER.info("📝 Registering sensors...")
                 await self._register_sensors()
                 self._sensors_registered = True
+                _LOGGER.info("✅ Sensors registered")
             
             # Backfill historic data on first run
             if not self._historic_data_sent and self.entry:
+                _LOGGER.info("⏳ Starting historic backfill...")
                 success = await self._backfill_historic_data()
                 if success:
                     self._historic_data_sent = True
+                    _LOGGER.info("✅ Historic backfill complete")
 
             # Send sensor readings
             if self.entry:
+                _LOGGER.info("📊 Sending current sensor readings...")
                 await self._send_sensor_readings()
+                _LOGGER.info("✅ Sensor readings sent")
 
             async with asyncio.timeout(15):
+                _LOGGER.info("🌐 Fetching backend data...")
                 # Fetch all endpoints in parallel for efficiency
                 health_task = self._fetch_json(ENDPOINT_HEALTH)
                 status_task = self._fetch_json(ENDPOINT_CONTROL_STATUS)
@@ -112,6 +119,7 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                     price_forecast_task,
                     return_exceptions=True,
                 )
+                _LOGGER.info("✅ Backend data fetched successfully")
 
             # Build response, handling individual failures gracefully
             data = {
@@ -149,12 +157,14 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             if isinstance(solar_forecast, Exception):
                 _LOGGER.debug("No solar forecast available yet: %s", solar_forecast)
 
-            _LOGGER.debug("Data fetch complete")
+            _LOGGER.info("🎉 Coordinator update cycle complete")
             return data
 
         except asyncio.TimeoutError as err:
+            _LOGGER.error("⏱️ Timeout fetching data from service: %s", err)
             raise UpdateFailed(f"Timeout fetching data from service: {err}") from err
         except Exception as err:
+            _LOGGER.error("❌ Error communicating with service: %s", err)
             raise UpdateFailed(f"Error communicating with service: {err}") from err
 
     async def _fetch_json(
@@ -283,24 +293,37 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
 
         config = {**self.entry.data, **self.entry.options}
         
+        # Get detected entities (sensors are stored under this key)
+        detected = config.get(CONF_DETECTED_ENTITIES, {})
+        
+        # Debug: Log what sensors are configured
+        _LOGGER.info("📋 Configured sensors:")
+        _LOGGER.info("  Solar: %s", detected.get(CONF_SOLAR_SENSORS, []))
+        _LOGGER.info("  Battery Charge: %s", detected.get(CONF_BATTERY_CHARGE_SENSORS, []))
+        _LOGGER.info("  Battery Discharge: %s", detected.get(CONF_BATTERY_DISCHARGE_SENSORS, []))
+        _LOGGER.info("  Grid Import: %s", detected.get(CONF_GRID_IMPORT_SENSORS, []))
+        _LOGGER.info("  Grid Export: %s", detected.get(CONF_GRID_EXPORT_SENSORS, []))
+        _LOGGER.info("  Battery SOC: %s", detected.get(CONF_BATTERY_SOC_ENTITY))
+        
         # Map our sensor categories to backend sensor types
         sensor_mappings = [
-            (config.get(CONF_SOLAR_SENSORS, []), "solar"),
-            (config.get(CONF_BATTERY_DISCHARGE_SENSORS, []), "soc"),  # Battery discharge correlates with SOC
-            (config.get(CONF_BATTERY_CHARGE_SENSORS, []), "soc"),
-            (config.get(CONF_GRID_IMPORT_SENSORS, []), "load"),  # Grid import indicates load
-            (config.get(CONF_GRID_EXPORT_SENSORS, []), "load"),
+            (detected.get(CONF_SOLAR_SENSORS, []), "solar"),
+            (detected.get(CONF_BATTERY_DISCHARGE_SENSORS, []), "soc"),  # Battery discharge correlates with SOC
+            (detected.get(CONF_BATTERY_CHARGE_SENSORS, []), "soc"),
+            (detected.get(CONF_GRID_IMPORT_SENSORS, []), "load"),  # Grid import indicates load
+            (detected.get(CONF_GRID_EXPORT_SENSORS, []), "load"),
         ]
         
         # Add battery SOC if configured
-        if battery_soc := config.get(CONF_BATTERY_SOC_ENTITY):
+        if battery_soc := detected.get(CONF_BATTERY_SOC_ENTITY):
             sensor_mappings.append(([battery_soc], "soc"))
         
         # Add house load if configured (CRITICAL for MPC)
-        if house_load := config.get(CONF_HOUSE_LOAD_ENTITY):
+        if house_load := detected.get(CONF_HOUSE_LOAD_ENTITY):
             sensor_mappings.append(([house_load], "load"))
 
         # Send data for each sensor type
+        sensors_sent = 0
         for entity_ids, sensor_type in sensor_mappings:
             for entity_id in entity_ids:
                 state = self.hass.states.get(entity_id)
@@ -323,12 +346,19 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                                 ],
                             }
                         )
-                        _LOGGER.debug("Sent %s reading for %s: %s", sensor_type, entity_id, value)
+                        sensors_sent += 1
+                        _LOGGER.debug("✓ Sent %s reading for %s: %s", sensor_type, entity_id, value)
                     except (ValueError, TypeError) as err:
-                        _LOGGER.debug("Could not parse value for %s: %s", entity_id, state.state)
+                        _LOGGER.warning("⚠️ Could not parse value for %s: %s (state=%s)", entity_id, err, state.state)
                     except Exception as err:
-                        _LOGGER.debug("Failed to send reading for %s: %s", entity_id, err)
-
+                        _LOGGER.warning("⚠️ Failed to send reading for %s: %s", entity_id, err)
+                else:
+                    if state:
+                        _LOGGER.debug("⏭️ Skipping %s: state=%s", entity_id, state.state)
+                    else:
+                        _LOGGER.warning("❌ Sensor not found: %s", entity_id)
+        
+        _LOGGER.info("📤 Sent %d sensor readings", sensors_sent)
     async def _backfill_historic_data(self) -> bool:
         """Backfill up to 7 days of historic sensor data on first run.
         
@@ -349,40 +379,52 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             
             config = {**self.entry.data, **self.entry.options}
             
-            # Extract detected_entities dict if present (new config flow format)
-            # This dict is nested inside config, not merged at top level
-            detected_entities = config.get(CONF_DETECTED_ENTITIES, {})
+            # Get detected entities (sensors are stored under this key)
+            detected = config.get(CONF_DETECTED_ENTITIES, {})
             
             # Calculate time range (7 days back)
             end_time = datetime.now(timezone.utc)
             start_time = end_time - timedelta(days=7)
             
-            # Collect all entity IDs to backfill
+            # Collect all entity IDs to backfill (using the same logic as _send_sensor_readings)
             entities_to_backfill = []
             
-            # Solar sensors (new format: inside detected_entities dict)
-            solar_entity = detected_entities.get(CONF_SOLAR_POWER_ENTITY) if isinstance(detected_entities, dict) else None
-            if solar_entity:
-                entities_to_backfill.append((solar_entity, "solar"))
-                _LOGGER.debug("Backfill: Found solar sensor: %s", solar_entity)
+            # Solar sensors (take first from list, or use all if needed)
+            solar_sensors = detected.get(CONF_SOLAR_SENSORS, [])
+            if solar_sensors:
+                # Just backfill the first solar sensor (usually solar_energy_total)
+                entities_to_backfill.append((solar_sensors[0], "solar"))
+                _LOGGER.debug("Backfill: Solar sensor: %s", solar_sensors[0])
             
-            # Battery SoC (inside detected_entities dict)
-            battery_soc = detected_entities.get(CONF_BATTERY_SOC_ENTITY) if isinstance(detected_entities, dict) else None
+            # Battery charge sensors
+            battery_charge_sensors = detected.get(CONF_BATTERY_CHARGE_SENSORS, [])
+            if battery_charge_sensors:
+                entities_to_backfill.append((battery_charge_sensors[0], "soc"))
+                _LOGGER.debug("Backfill: Battery charge sensor: %s", battery_charge_sensors[0])
+            
+            # Battery discharge sensors
+            battery_discharge_sensors = detected.get(CONF_BATTERY_DISCHARGE_SENSORS, [])
+            if battery_discharge_sensors:
+                entities_to_backfill.append((battery_discharge_sensors[0], "soc"))
+                _LOGGER.debug("Backfill: Battery discharge sensor: %s", battery_discharge_sensors[0])
+            
+            # Grid import sensors
+            grid_import_sensors = detected.get(CONF_GRID_IMPORT_SENSORS, [])
+            if grid_import_sensors:
+                entities_to_backfill.append((grid_import_sensors[0], "load"))
+                _LOGGER.debug("Backfill: Grid import sensor: %s", grid_import_sensors[0])
+            
+            # Grid export sensors
+            grid_export_sensors = detected.get(CONF_GRID_EXPORT_SENSORS, [])
+            if grid_export_sensors:
+                entities_to_backfill.append((grid_export_sensors[0], "load"))
+                _LOGGER.debug("Backfill: Grid export sensor: %s", grid_export_sensors[0])
+            
+            # Battery SoC
+            battery_soc = detected.get(CONF_BATTERY_SOC_ENTITY)
             if battery_soc:
                 entities_to_backfill.append((battery_soc, "soc"))
-                _LOGGER.debug("Backfill: Found battery SoC sensor: %s", battery_soc)
-            
-            # Grid import (inside detected_entities dict, with custom key name)
-            grid_import = detected_entities.get("grid_import_sensor") if isinstance(detected_entities, dict) else None
-            if grid_import:
-                entities_to_backfill.append((grid_import, "load"))
-                _LOGGER.debug("Backfill: Found grid import sensor: %s", grid_import)
-            
-            # Grid export (inside detected_entities dict, with custom key name)
-            grid_export = detected_entities.get("grid_export_sensor") if isinstance(detected_entities, dict) else None
-            if grid_export:
-                entities_to_backfill.append((grid_export, "load"))
-                _LOGGER.debug("Backfill: Found grid export sensor: %s", grid_export)
+                _LOGGER.debug("Backfill: Battery SOC sensor: %s", battery_soc)
             
             if not entities_to_backfill:
                 _LOGGER.info("No entities configured for historic backfill")
