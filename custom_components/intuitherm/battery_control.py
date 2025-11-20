@@ -15,6 +15,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
+from .const import CONF_DRY_RUN_MODE, CONF_DETECTED_ENTITIES
+
 if TYPE_CHECKING:
     from .coordinator import IntuiThermDataUpdateCoordinator
 
@@ -142,6 +144,15 @@ class BatteryControlExecutor:
                 _LOGGER.debug("Automatic control disabled, skipping execution")
                 return
             
+            # Check if demo mode is enabled (dry_run)
+            detected_entities = self.config.get(CONF_DETECTED_ENTITIES, {})
+            demo_mode = detected_entities.get(CONF_DRY_RUN_MODE, False)
+            
+            if demo_mode:
+                _LOGGER.info("🎮 Demo mode active - MPC control would execute: mode=%s, power=%.2fkW (NOT executing)", 
+                           "TBD", 0.0)  # Will be updated with actual values later
+                # Continue to fetch and log the plan, but don't execute
+            
             # Get control plan from coordinator
             control_plan = self.coordinator.data.get("control_plan", {}) if self.coordinator.data else {}
             
@@ -185,6 +196,16 @@ class BatteryControlExecutor:
             # Execute the control
             mode = target_control.get("control_action")
             power = target_control.get("power_setpoint", 0.0)
+            
+            # Check demo mode again before execution
+            detected_entities = self.config.get(CONF_DETECTED_ENTITIES, {})
+            demo_mode = detected_entities.get(CONF_DRY_RUN_MODE, False)
+            
+            if demo_mode:
+                _LOGGER.info(
+                    f"🎮 Demo mode: Would execute mode={mode}, power={power}kW at {now} (NOT executing)"
+                )
+                return  # Don't execute in demo mode
             
             _LOGGER.info(
                 f"Executing control: mode={mode}, power={power}kW at {now}"
