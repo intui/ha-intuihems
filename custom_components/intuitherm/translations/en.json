@@ -5,6 +5,10 @@
         "title": "intuiHEMS Energy Optimization v{version}",
         "description": "This setup wizard will:\n\n🔍 Auto-detect your energy devices\n   • Battery systems\n   • Solar inverters\n   • Grid meters\n\n📊 Find the best sensors to monitor\n   • Cumulative energy meters (kWh) - most reliable\n   • Battery state of charge (%)\n   • Power sensors (kW) - fallback\n\n⚡ Enable battery optimization\n   • Smart charging during cheap hours\n   • Maximize solar self-consumption\n   • Minimize grid costs\n\nPrerequisites:\n• Home Assistant Energy Dashboard configured\n• Battery/Solar/Grid devices integrated\n\nSetup takes ~2 minutes."
       },
+      "show_user_id": {
+        "title": "✅ Registration Successful!",
+        "description": "Your user ID is:\n\n**{user_id}**\n\nℹ️ Save this ID for troubleshooting and support.\n\nClick Submit to continue with device detection."
+      },
       "auto_detect": {
         "title": "Auto-Detecting Energy Sensors",
         "description": "Scanning your Home Assistant Energy Dashboard and devices...\n\nWe prefer cumulative energy sensors (kWh) because they provide the most reliable data for optimization. The backend will automatically compute power values from these.\n\nThis may take 10-15 seconds."
@@ -24,7 +28,9 @@
           "grid_import": "Grid Import Sensor",
           "grid_import_custom": "  ↳ Or enter custom entity ID",
           "grid_export": "Grid Export Sensor",
-          "grid_export_custom": "  ↳ Or enter custom entity ID"
+          "grid_export_custom": "  ↳ Or enter custom entity ID",
+          "house_load": "House Load Sensor (OPTIONAL)",
+          "house_load_custom": "  ↳ Or enter custom entity ID"
         },
         "data_description": {
           "solar_production": "Select cumulative solar energy production sensor (kWh preferred)",
@@ -34,7 +40,9 @@
           "grid_import": "Select cumulative energy imported from grid (kWh preferred)",
           "grid_import_custom": "Leave blank to use dropdown selection above",
           "grid_export": "Select cumulative energy exported to grid (kWh preferred)",
-          "grid_export_custom": "Leave blank to use dropdown selection above"
+          "grid_export_custom": "Leave blank to use dropdown selection above",
+          "house_load": "OPTIONAL - If not provided, will be auto-calculated from: Solar + Battery Discharge + Grid Import - Battery Charge - Grid Export",
+          "house_load_custom": "Leave blank to use dropdown selection above or to auto-calculate"
         }
       },
       "pricing": {

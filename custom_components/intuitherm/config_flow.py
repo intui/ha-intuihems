@@ -229,8 +229,12 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             self._detected_entities[CONF_USER_ID] = user_id
                             self._detected_entities[CONF_REGISTERED_AT] = datetime.now(dt_timezone.utc).isoformat()
                             
-                            # Move to auto-detection
-                            return await self.async_step_auto_detect()
+                            # Show user ID to user before continuing
+                            return self.async_show_form(
+                                step_id="show_user_id",
+                                data_schema=vol.Schema({}),
+                                description_placeholders={"user_id": user_id},
+                            )
                             
                         elif resp.status == 409:
                             # Already registered - backend will deactivate old user and allow re-registration
@@ -270,6 +274,24 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="register",
             data_schema=vol.Schema({}),
             errors=errors,
+        )
+
+    async def async_step_show_user_id(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Show user ID after registration."""
+        if user_input is not None:
+            # User clicked continue, proceed to auto-detection
+            return await self.async_step_auto_detect()
+        
+        # This should never happen since user_id is set during registration
+        # but provide fallback just in case
+        user_id = self._detected_entities.get(CONF_USER_ID, "Unknown")
+        
+        return self.async_show_form(
+            step_id="show_user_id",
+            data_schema=vol.Schema({}),
+            description_placeholders={"user_id": user_id},
         )
 
     async def async_step_auto_detect(
@@ -695,6 +717,9 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not grid_export:
                 errors["grid_export"] = "Grid export sensor is required"
             
+            # Get house load (optional)
+            house_load = user_input.get("house_load_custom") or user_input.get("house_load")
+            
             # Validate entities exist
             if not errors:
                 for sensor_id, field_name in [
@@ -704,6 +729,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     (battery_discharge, "battery_discharge"),
                     (grid_import, "grid_import"),
                     (grid_export, "grid_export"),
+                    (house_load, "house_load"),  # Optional
                 ]:
                     if sensor_id and not self.hass.states.get(sensor_id):
                         # Check if custom field was used
@@ -722,6 +748,12 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._detected_entities[CONF_BATTERY_DISCHARGE_SENSORS] = [battery_discharge] if battery_discharge else []
                 self._detected_entities[CONF_GRID_IMPORT_SENSORS] = [grid_import] if grid_import else []
                 self._detected_entities[CONF_GRID_EXPORT_SENSORS] = [grid_export] if grid_export else []
+                # Store house load if provided (optional - will be calculated from energy balance if not provided)
+                if house_load:
+                    self._detected_entities[CONF_HOUSE_LOAD_ENTITY] = house_load
+                    _LOGGER.info("House load sensor configured: %s", house_load)
+                else:
+                    _LOGGER.info("No house load sensor - will auto-calculate from energy balance")
                 
                 # Proceed to pricing configuration
                 return await self.async_step_pricing()
@@ -944,6 +976,28 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             grid_export_options = build_selector_dict(grid_export)
             schema[vol.Required("grid_export", default=recommended_grid_export)] = vol.In(grid_export_options)
             schema[vol.Optional("grid_export_custom", description="Or enter custom entity ID")] = str
+        
+        # House load (optional - will be calculated from energy balance if not provided)
+        # Get all power sensors for dropdown
+        house_load_entities = {}
+        for entry in entity_registry.entities.values():
+            if entry.domain != "sensor" or entry.disabled_by:
+                continue
+            state = self.hass.states.get(entry.entity_id)
+            if not state:
+                continue
+            unit = state.attributes.get("unit_of_measurement", "").lower()
+            if unit in ["kw", "w", "kwh", "wh"]:
+                unit_display = state.attributes.get("unit_of_measurement", "")
+                house_load_entities[entry.entity_id] = f"{entry.entity_id} [{unit_display}] ({entry.original_name or entry.entity_id})"
+        
+        if house_load_entities:
+            current_house_load = self._detected_entities.get(CONF_HOUSE_LOAD_ENTITY)
+            if current_house_load:
+                schema[vol.Optional("house_load", default=current_house_load, description="OPTIONAL - Auto-calculated if not provided")] = vol.In(house_load_entities)
+            else:
+                schema[vol.Optional("house_load", description="OPTIONAL - Auto-calculated from: Solar + Battery Discharge + Grid Import - Battery Charge - Grid Export")] = vol.In(house_load_entities)
+            schema[vol.Optional("house_load_custom", description="Or enter custom entity ID")] = str
         
         return self.async_show_form(
             step_id="review",
