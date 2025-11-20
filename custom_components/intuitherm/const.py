@@ -5,7 +5,7 @@ from typing import Final
 DOMAIN: Final = "intuitherm"
 
 # Version
-VERSION = "2025.11.20.1"
+VERSION = "2025.11.20.2"
 
 # Platforms
 PLATFORMS: Final = ["sensor", "switch"]
@@ -36,6 +36,10 @@ CONF_BATTERY_MODE_SELECT: Final = "battery_mode_select"  # Battery work mode sel
 CONF_BATTERY_CHARGE_POWER: Final = "battery_charge_power"  # Battery charge power number entity  
 CONF_BATTERY_DISCHARGE_POWER: Final = "battery_discharge_power"  # Battery discharge power number entity
 
+# Battery specifications
+CONF_BATTERY_CAPACITY: Final = "battery_capacity_kwh"  # Battery capacity in kWh
+CONF_BATTERY_MAX_POWER: Final = "battery_max_power_kw"  # Battery max charge/discharge power in kW
+
 # House load configuration
 CONF_HOUSE_LOAD_CALC_MODE: Final = "house_load_calc_mode"  # "auto" or "manual"
 
@@ -49,6 +53,8 @@ CONF_DRY_RUN_MODE: Final = "dry_run_mode"  # Test mode - MPC runs but doesn't se
 # Default values
 DEFAULT_SERVICE_URL: Final = "https://api.intuihems.de"
 DEFAULT_UPDATE_INTERVAL: Final = 110  # seconds
+DEFAULT_BATTERY_CAPACITY: Final = 10.0  # kWh
+DEFAULT_BATTERY_MAX_POWER: Final = 3.0  # kW
 DEFAULT_EPEX_MARKUP: Final = 0.10  # €0.10/kWh markup
 DEFAULT_GRID_EXPORT_PRICE: Final = 0.08  # €0.08/kWh feed-in tariff
 
@@ -64,6 +70,7 @@ ENDPOINT_CONTROL_DISABLE: Final = "/api/v1/control/disable"
 ENDPOINT_METRICS: Final = "/api/v1/metrics"
 ENDPOINT_SENSORS: Final = "/api/v1/sensors"
 ENDPOINT_SENSOR_READINGS: Final = "/api/v1/sensors/{sensor_id}/readings"
+ENDPOINT_UPDATE_CONFIG: Final = "/api/v1/config"
 
 # Service names
 SERVICE_MANUAL_OVERRIDE: Final = "manual_override"

@@ -33,6 +33,8 @@ from .const import (
     CONF_BATTERY_MODE_SELECT,
     CONF_BATTERY_CHARGE_POWER,
     CONF_BATTERY_DISCHARGE_POWER,
+    CONF_BATTERY_CAPACITY,
+    CONF_BATTERY_MAX_POWER,
     CONF_HOUSE_LOAD_CALC_MODE,
     CONF_EPEX_MARKUP,
     CONF_GRID_EXPORT_PRICE,
@@ -42,8 +44,11 @@ from .const import (
     CONF_REGISTERED_AT,
     DEFAULT_SERVICE_URL,
     DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_BATTERY_CAPACITY,
+    DEFAULT_BATTERY_MAX_POWER,
     DEFAULT_EPEX_MARKUP,
     DEFAULT_GRID_EXPORT_PRICE,
+    ENDPOINT_UPDATE_CONFIG,
     ENDPOINT_AUTH_STATUS,
     ENDPOINT_AUTH_REGISTER,
     ENDPOINT_HEALTH,
@@ -1757,12 +1762,24 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 if user_input.get("grid_export"):
                     detected_entities[CONF_GRID_EXPORT_SENSORS] = [user_input["grid_export"]]
                 
-                # Build options dict with updated sensors
+                # Build options dict with updated sensors and battery specs
                 # Note: Service URL and API key are preserved from original config (not user-editable)
                 options_data = {
                     CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL),
                     CONF_DETECTED_ENTITIES: detected_entities,
+                    CONF_BATTERY_CAPACITY: user_input.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
+                    CONF_BATTERY_MAX_POWER: user_input.get(CONF_BATTERY_MAX_POWER, DEFAULT_BATTERY_MAX_POWER),
                 }
+                
+                # Send battery configuration to backend
+                try:
+                    await self._update_battery_config(
+                        current_config,
+                        options_data[CONF_BATTERY_CAPACITY],
+                        options_data[CONF_BATTERY_MAX_POWER]
+                    )
+                except Exception as err:
+                    _LOGGER.warning("Failed to update battery config on backend: %s", err)
                 
                 # Save updated options
                 return self.async_create_entry(title="", data=options_data)
@@ -1814,6 +1831,16 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 CONF_UPDATE_INTERVAL,
                 default=current_config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
             ): vol.All(vol.Coerce(int), vol.Range(min=30, max=300)),
+            vol.Required(
+                CONF_BATTERY_CAPACITY,
+                default=current_config.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
+                description="Battery capacity (kWh)"
+            ): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
+            vol.Required(
+                CONF_BATTERY_MAX_POWER,
+                default=current_config.get(CONF_BATTERY_MAX_POWER, DEFAULT_BATTERY_MAX_POWER),
+                description="Battery max power (kW)"
+            ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0)),
         }
 
         # Add entity selectors with values from detected_entities
@@ -1891,3 +1918,27 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(schema),
             errors=errors,
         )
+    
+    async def _update_battery_config(self, config: dict, capacity_kwh: float, max_power_kw: float) -> None:
+        """Update battery configuration on the backend."""
+        service_url = config.get(CONF_SERVICE_URL, DEFAULT_SERVICE_URL)
+        api_key = config.get(CONF_API_KEY)
+        
+        if not api_key:
+            raise ValueError("No API key available")
+        
+        session = async_get_clientsession(self.hass)
+        headers = {"Authorization": f"Bearer {api_key}"}
+        url = f"{service_url}{ENDPOINT_UPDATE_CONFIG}"
+        
+        payload = {
+            "battery_capacity_kwh": capacity_kwh,
+            "battery_max_power_kw": max_power_kw
+        }
+        
+        async with session.post(url, json=payload, headers=headers) as response:
+            if response.status not in [200, 201]:
+                error_text = await response.text()
+                raise Exception(f"Backend returned {response.status}: {error_text}")
+            
+        _LOGGER.info("Updated battery config on backend: %.1f kWh @ %.2f kW", capacity_kwh, max_power_kw)
