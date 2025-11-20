@@ -5,7 +5,7 @@ from typing import Final
 DOMAIN: Final = "intuitherm"
 
 # Version
-VERSION = "2025.11.20.7"
+VERSION = "2025.11.20.8"
 
 # Platforms
 PLATFORMS: Final = ["sensor", "switch"]
@@ -93,6 +93,7 @@ SENSOR_TYPE_DRY_RUN_MODE: Final = "dry_run_mode"
 
 # Switch types
 SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"
+SWITCH_TYPE_DEMO_MODE: Final = "demo_mode"
 
 # Device-based control entity mappings
 # Maps (platform, manufacturer, model_pattern) -> control entity patterns

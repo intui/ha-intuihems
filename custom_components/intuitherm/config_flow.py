@@ -837,7 +837,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }),
             errors=errors,
             description_placeholders={
-                "dry_run_info": "Enable test mode to run optimization without sending commands to your battery. Perfect for testing!"
+                "dry_run_info": "Enable demo mode to run optimization without sending commands to your battery. Perfect for testing!"
             },
         )
 

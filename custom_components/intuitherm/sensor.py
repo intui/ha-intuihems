@@ -462,8 +462,8 @@ class IntuiThermDryRunModeSensor(IntuiThermSensorBase):
             coordinator,
             entry,
             SENSOR_TYPE_DRY_RUN_MODE,
-            "Test Mode",
-            "mdi:test-tube",
+            "Demo Mode Status",
+            "mdi:information",
         )
         self._entry = entry
 
@@ -494,8 +494,9 @@ class IntuiThermDryRunModeSensor(IntuiThermSensorBase):
         dry_run_mode = detected_entities.get(CONF_DRY_RUN_MODE, False)
         
         attrs = {
-            "description": "Test mode - MPC runs but doesn't control battery" if dry_run_mode else "Normal mode - battery control enabled",
+            "description": "Demo mode - MPC runs but doesn't control battery" if dry_run_mode else "Normal mode - battery control enabled",
             "commands_executed": not dry_run_mode,
+            "note": "Use the Demo Mode switch in controls to toggle this setting"
         }
         
         if dry_run_mode:
