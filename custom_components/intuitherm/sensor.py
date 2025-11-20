@@ -303,12 +303,13 @@ class IntuiThermMPCSuccessRateSensor(IntuiThermSensorBase):
         if not metrics_data or isinstance(metrics_data, Exception):
             return None
 
-        # Calculate success rate from metrics
-        total_runs = metrics_data.get("mpc_total_runs", 0)
-        successful_runs = metrics_data.get("mpc_successful_runs", 0)
+        # Access nested mpc_metrics structure
+        mpc_metrics = metrics_data.get("mpc_metrics", {})
+        total_runs = mpc_metrics.get("total_runs", 0)
+        successful_runs = mpc_metrics.get("successful_runs", 0)
 
         if total_runs == 0:
-            return None
+            return 0.0  # Return 0% instead of None for new users
 
         return round((successful_runs / total_runs) * 100, 1)
 
@@ -323,18 +324,15 @@ class IntuiThermMPCSuccessRateSensor(IntuiThermSensorBase):
         if not metrics_data or isinstance(metrics_data, Exception):
             return {"error": str(metrics_data)}
 
-        attrs = {}
-
-        # Add raw counts
-        if "mpc_total_runs" in metrics_data:
-            attrs["total_runs"] = metrics_data["mpc_total_runs"]
-        if "mpc_successful_runs" in metrics_data:
-            attrs["successful_runs"] = metrics_data["mpc_successful_runs"]
-        if "mpc_failed_runs" in metrics_data:
-            attrs["failed_runs"] = metrics_data["mpc_failed_runs"]
-
-        # Add period
-        attrs["period"] = "1 hour"
+        # Access nested mpc_metrics structure
+        mpc_metrics = metrics_data.get("mpc_metrics", {})
+        
+        attrs = {
+            "total_runs": mpc_metrics.get("total_runs", 0),
+            "successful_runs": mpc_metrics.get("successful_runs", 0),
+            "failed_runs": mpc_metrics.get("total_runs", 0) - mpc_metrics.get("successful_runs", 0),
+            "period": f"{metrics_data.get('period_hours', 1)} hour(s)",
+        }
 
         return attrs
 
@@ -365,11 +363,9 @@ class IntuiThermMPCSolveTimeSensor(IntuiThermSensorBase):
         if not metrics_data or isinstance(metrics_data, Exception):
             return None
 
-        # Get average solve time
-        avg_solve_time_ms = metrics_data.get("mpc_avg_solve_time_ms")
-
-        if avg_solve_time_ms is None:
-            return None
+        # Access nested mpc_metrics structure
+        mpc_metrics = metrics_data.get("mpc_metrics", {})
+        avg_solve_time_ms = mpc_metrics.get("avg_solve_time_ms", 0.0)
 
         return round(avg_solve_time_ms, 1)
 
@@ -384,16 +380,18 @@ class IntuiThermMPCSolveTimeSensor(IntuiThermSensorBase):
         if not metrics_data or isinstance(metrics_data, Exception):
             return {"error": str(metrics_data)}
 
-        attrs = {}
-
-        # Add min/max if available
-        if "mpc_min_solve_time_ms" in metrics_data:
-            attrs["min_solve_time_ms"] = metrics_data["mpc_min_solve_time_ms"]
-        if "mpc_max_solve_time_ms" in metrics_data:
-            attrs["max_solve_time_ms"] = metrics_data["mpc_max_solve_time_ms"]
-
-        # Add period
-        attrs["period"] = "1 hour"
+        # Access nested mpc_metrics structure
+        mpc_metrics = metrics_data.get("mpc_metrics", {})
+        
+        attrs = {
+            "period": f"{metrics_data.get('period_hours', 1)} hour(s)",
+        }
+        
+        # Add min/max if available (these may not be in current API response)
+        if "min_solve_time_ms" in mpc_metrics:
+            attrs["min_solve_time_ms"] = mpc_metrics["min_solve_time_ms"]
+        if "max_solve_time_ms" in mpc_metrics:
+            attrs["max_solve_time_ms"] = mpc_metrics["max_solve_time_ms"]
 
         return attrs
 
@@ -414,22 +412,20 @@ class IntuiThermMPCRuns24hSensor(IntuiThermSensorBase):
 
     @property
     def native_value(self) -> int | None:
-        """Return number of MPC runs in the last 24 hours."""
+        """Return number of MPC runs in the last hour."""
         if not self.coordinator.data or self.coordinator.data is None:
             return None
 
-        # Note: This sensor will show the 1-hour count from the metrics endpoint
-        # In a future enhancement, we could query /api/v1/metrics?period_hours=24
-        # separately to get true 24h counts
+        # Note: This sensor shows the 1-hour count from the metrics endpoint
+        # Period is shown in attributes
         metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
 
         if not metrics_data or isinstance(metrics_data, Exception):
             return None
 
-        total_runs = metrics_data.get("mpc_total_runs")
-
-        if total_runs is None:
-            return None
+        # Access nested mpc_metrics structure
+        mpc_metrics = metrics_data.get("mpc_metrics", {})
+        total_runs = mpc_metrics.get("total_runs", 0)
 
         return total_runs
 
@@ -444,18 +440,15 @@ class IntuiThermMPCRuns24hSensor(IntuiThermSensorBase):
         if not metrics_data or isinstance(metrics_data, Exception):
             return {"error": str(metrics_data)}
 
-        attrs = {}
-
-        # Add successful/failed breakdown
-        if "mpc_successful_runs" in metrics_data:
-            attrs["successful"] = metrics_data["mpc_successful_runs"]
-        if "mpc_failed_runs" in metrics_data:
-            attrs["failed"] = metrics_data["mpc_failed_runs"]
-
-        # Note: Currently showing 1h period due to coordinator implementation
-        # TODO: Fetch 24h metrics separately for this sensor
-        attrs["period"] = "1 hour (displaying)"
-        attrs["note"] = "24h tracking not yet implemented"
+        # Access nested mpc_metrics structure
+        mpc_metrics = metrics_data.get("mpc_metrics", {})
+        
+        attrs = {
+            "successful": mpc_metrics.get("successful_runs", 0),
+            "failed": mpc_metrics.get("total_runs", 0) - mpc_metrics.get("successful_runs", 0),
+            "period": f"{metrics_data.get('period_hours', 1)} hour(s)",
+            "success_rate": round(mpc_metrics.get("success_rate", 0), 1),
+        }
 
         return attrs
 
