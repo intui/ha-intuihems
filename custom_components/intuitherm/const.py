@@ -48,7 +48,7 @@ CONF_DRY_RUN_MODE: Final = "dry_run_mode"  # Test mode - MPC runs but doesn't se
 
 # Default values
 DEFAULT_SERVICE_URL: Final = "https://api.intuihems.de"
-DEFAULT_UPDATE_INTERVAL: Final = 60  # seconds
+DEFAULT_UPDATE_INTERVAL: Final = 110  # seconds
 DEFAULT_EPEX_MARKUP: Final = 0.10  # €0.10/kWh markup
 DEFAULT_GRID_EXPORT_PRICE: Final = 0.08  # €0.08/kWh feed-in tariff
 

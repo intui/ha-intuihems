@@ -1732,39 +1732,46 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Test connection if URL or API key changed
+            # Get current configuration
             current_config = {**self.config_entry.data, **self.config_entry.options}
-            if (
-                user_input.get(CONF_SERVICE_URL) != current_config.get(CONF_SERVICE_URL)
-                or user_input.get(CONF_API_KEY) != current_config.get(CONF_API_KEY)
-            ):
-                # Validate connection with new credentials
-                session = async_get_clientsession(self.hass)
-                service_url = user_input[CONF_SERVICE_URL].rstrip("/")
-                api_key = user_input[CONF_API_KEY]
-
-                try:
-                    async with asyncio.timeout(10):
-                        headers = {"Authorization": f"Bearer {api_key}"}
-                        async with session.get(
-                            f"{service_url}{ENDPOINT_HEALTH}", headers=headers
-                        ) as resp:
-                            if resp.status == 401:
-                                errors["base"] = "invalid_api_key"
-                            elif resp.status != 200:
-                                errors["base"] = "cannot_connect"
-                except asyncio.TimeoutError:
-                    errors["base"] = "timeout_connect"
-                except Exception:  # pylint: disable=broad-except
-                    _LOGGER.exception("Unexpected error connecting to service")
-                    errors["base"] = "unknown"
-
+            
             if not errors:
+                # Update detected_entities with any changed sensors
+                detected_entities = current_config.get(CONF_DETECTED_ENTITIES, {}).copy()
+                
+                # Update sensor selections if provided
+                if user_input.get(CONF_BATTERY_SOC_ENTITY):
+                    detected_entities[CONF_BATTERY_SOC_ENTITY] = user_input[CONF_BATTERY_SOC_ENTITY]
+                if user_input.get(CONF_SOLAR_POWER_ENTITY):
+                    detected_entities[CONF_SOLAR_POWER_ENTITY] = user_input[CONF_SOLAR_POWER_ENTITY]
+                if user_input.get(CONF_HOUSE_LOAD_ENTITY):
+                    detected_entities[CONF_HOUSE_LOAD_ENTITY] = user_input[CONF_HOUSE_LOAD_ENTITY]
+                
+                # Update battery charge/discharge sensors (stored as lists)
+                if user_input.get("battery_charge"):
+                    detected_entities[CONF_BATTERY_CHARGE_SENSORS] = [user_input["battery_charge"]]
+                if user_input.get("battery_discharge"):
+                    detected_entities[CONF_BATTERY_DISCHARGE_SENSORS] = [user_input["battery_discharge"]]
+                if user_input.get("grid_import"):
+                    detected_entities[CONF_GRID_IMPORT_SENSORS] = [user_input["grid_import"]]
+                if user_input.get("grid_export"):
+                    detected_entities[CONF_GRID_EXPORT_SENSORS] = [user_input["grid_export"]]
+                
+                # Build options dict with updated sensors
+                # Note: Service URL and API key are preserved from original config (not user-editable)
+                options_data = {
+                    CONF_UPDATE_INTERVAL: user_input.get(CONF_UPDATE_INTERVAL),
+                    CONF_DETECTED_ENTITIES: detected_entities,
+                }
+                
                 # Save updated options
-                return self.async_create_entry(title="", data=user_input)
+                return self.async_create_entry(title="", data=options_data)
 
         # Get current configuration (merge data and options)
         current_config = {**self.config_entry.data, **self.config_entry.options}
+        
+        # Get detected entities from config
+        detected_entities = current_config.get(CONF_DETECTED_ENTITIES, {})
 
         # Get entity lists
         entity_registry = er.async_get(self.hass)
@@ -1801,41 +1808,83 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 )
 
         # Build schema with current values as defaults
+        # Note: Service URL and API key are not user-configurable (registered during setup)
         schema = {
-            vol.Required(
-                CONF_SERVICE_URL,
-                default=current_config.get(CONF_SERVICE_URL, DEFAULT_SERVICE_URL)
-            ): str,
-            vol.Required(
-                CONF_API_KEY,
-                default=current_config.get(CONF_API_KEY, "")
-            ): str,
             vol.Required(
                 CONF_UPDATE_INTERVAL,
                 default=current_config.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
             ): vol.All(vol.Coerce(int), vol.Range(min=30, max=300)),
         }
 
-        # Add entity selectors if entities available
+        # Add entity selectors with values from detected_entities
         if soc_entities:
-            current_soc = current_config.get(CONF_BATTERY_SOC_ENTITY)
-            if current_soc and current_soc in soc_entities:
+            current_soc = detected_entities.get(CONF_BATTERY_SOC_ENTITY)
+            # Ensure the current value is in the list, otherwise add it
+            if current_soc and current_soc not in soc_entities:
+                soc_entities[current_soc] = f"{current_soc} (configured)"
+            if current_soc:
                 schema[vol.Optional(CONF_BATTERY_SOC_ENTITY, default=current_soc)] = vol.In(soc_entities)
             else:
                 schema[vol.Optional(CONF_BATTERY_SOC_ENTITY)] = vol.In(soc_entities)
 
         if power_entities:
-            current_solar = current_config.get(CONF_SOLAR_POWER_ENTITY)
-            if current_solar and current_solar in power_entities:
+            # Solar Power
+            current_solar = detected_entities.get(CONF_SOLAR_POWER_ENTITY)
+            if current_solar and current_solar not in power_entities:
+                power_entities[current_solar] = f"{current_solar} (configured)"
+            if current_solar:
                 schema[vol.Optional(CONF_SOLAR_POWER_ENTITY, default=current_solar)] = vol.In(power_entities)
             else:
                 schema[vol.Optional(CONF_SOLAR_POWER_ENTITY)] = vol.In(power_entities)
 
-            current_load = current_config.get(CONF_HOUSE_LOAD_ENTITY)
-            if current_load and current_load in power_entities:
+            # House Load
+            current_load = detected_entities.get(CONF_HOUSE_LOAD_ENTITY)
+            if current_load and current_load not in power_entities:
+                power_entities[current_load] = f"{current_load} (configured)"
+            if current_load:
                 schema[vol.Optional(CONF_HOUSE_LOAD_ENTITY, default=current_load)] = vol.In(power_entities)
             else:
                 schema[vol.Optional(CONF_HOUSE_LOAD_ENTITY)] = vol.In(power_entities)
+            
+            # Battery Charge (from list)
+            battery_charge_sensors = detected_entities.get(CONF_BATTERY_CHARGE_SENSORS, [])
+            current_charge = battery_charge_sensors[0] if battery_charge_sensors else None
+            if current_charge and current_charge not in power_entities:
+                power_entities[current_charge] = f"{current_charge} (configured)"
+            if current_charge:
+                schema[vol.Optional("battery_charge", default=current_charge, description="Battery charging sensor")] = vol.In(power_entities)
+            else:
+                schema[vol.Optional("battery_charge", description="Battery charging sensor")] = vol.In(power_entities)
+            
+            # Battery Discharge (from list)
+            battery_discharge_sensors = detected_entities.get(CONF_BATTERY_DISCHARGE_SENSORS, [])
+            current_discharge = battery_discharge_sensors[0] if battery_discharge_sensors else None
+            if current_discharge and current_discharge not in power_entities:
+                power_entities[current_discharge] = f"{current_discharge} (configured)"
+            if current_discharge:
+                schema[vol.Optional("battery_discharge", default=current_discharge, description="Battery discharging sensor")] = vol.In(power_entities)
+            else:
+                schema[vol.Optional("battery_discharge", description="Battery discharging sensor")] = vol.In(power_entities)
+            
+            # Grid Import (from list)
+            grid_import_sensors = detected_entities.get(CONF_GRID_IMPORT_SENSORS, [])
+            current_grid_import = grid_import_sensors[0] if grid_import_sensors else None
+            if current_grid_import and current_grid_import not in power_entities:
+                power_entities[current_grid_import] = f"{current_grid_import} (configured)"
+            if current_grid_import:
+                schema[vol.Optional("grid_import", default=current_grid_import, description="Grid consumption sensor")] = vol.In(power_entities)
+            else:
+                schema[vol.Optional("grid_import", description="Grid consumption sensor")] = vol.In(power_entities)
+            
+            # Grid Export (from list)
+            grid_export_sensors = detected_entities.get(CONF_GRID_EXPORT_SENSORS, [])
+            current_grid_export = grid_export_sensors[0] if grid_export_sensors else None
+            if current_grid_export and current_grid_export not in power_entities:
+                power_entities[current_grid_export] = f"{current_grid_export} (configured)"
+            if current_grid_export:
+                schema[vol.Optional("grid_export", default=current_grid_export, description="Grid export/feed-in sensor")] = vol.In(power_entities)
+            else:
+                schema[vol.Optional("grid_export", description="Grid export/feed-in sensor")] = vol.In(power_entities)
 
         return self.async_show_form(
             step_id="init",
