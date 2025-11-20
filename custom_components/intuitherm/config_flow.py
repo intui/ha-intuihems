@@ -695,13 +695,13 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Handle user selections - check for custom entries (prioritize custom fields)
-            solar_production = user_input.get("solar_production_custom", "").strip() or user_input.get("solar_production")
-            battery_soc = user_input.get("battery_soc_custom", "").strip() or user_input.get("battery_soc")
-            battery_charge = user_input.get("battery_charge_custom", "").strip() or user_input.get("battery_charge")
-            battery_discharge = user_input.get("battery_discharge_custom", "").strip() or user_input.get("battery_discharge")
-            grid_import = user_input.get("grid_import_custom", "").strip() or user_input.get("grid_import")
-            grid_export = user_input.get("grid_export_custom", "").strip() or user_input.get("grid_export")
+            # Get sensor selections (single field per sensor, supports custom text)
+            solar_production = user_input.get("solar_production", "").strip()
+            battery_soc = user_input.get("battery_soc", "").strip()
+            battery_charge = user_input.get("battery_charge", "").strip()
+            battery_discharge = user_input.get("battery_discharge", "").strip()
+            grid_import = user_input.get("grid_import", "").strip()
+            grid_export = user_input.get("grid_export", "").strip()
             
             # Validate that all required sensors are provided
             if not solar_production:
@@ -718,7 +718,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["grid_export"] = "Grid export sensor is required"
             
             # Get house load (optional)
-            house_load = user_input.get("house_load_custom") or user_input.get("house_load")
+            house_load = user_input.get("house_load", "").strip() or None
             
             # Validate entities exist
             if not errors:
@@ -732,12 +732,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     (house_load, "house_load"),  # Optional
                 ]:
                     if sensor_id and not self.hass.states.get(sensor_id):
-                        # Check if custom field was used
-                        custom_field = f"{field_name}_custom"
-                        if user_input.get(custom_field):
-                            errors[custom_field] = f"Entity '{sensor_id}' not found in Home Assistant"
-                        else:
-                            errors[field_name] = f"Entity '{sensor_id}' not found in Home Assistant"
+                        errors[field_name] = f"Entity '{sensor_id}' not found in Home Assistant"
             
             if not errors:
                 # Store the final selected sensors
@@ -917,69 +912,88 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         recommended_battery_charge = battery_charge[0] if battery_charge else None
         recommended_battery_discharge = battery_discharge[0] if battery_discharge else None
         
-        # Build dropdown options with friendly names (including "or enter custom" option)
-        def build_selector_dict(sensor_list):
-            """Build a selector dict from sensor list."""
-            selector_dict = {}
-            for sensor_id in sensor_list:
-                state = self.hass.states.get(sensor_id)
-                if state:
-                    unit = state.attributes.get("unit_of_measurement", "")
-                    selector_dict[sensor_id] = f"{sensor_id} ({unit})"
-                else:
-                    selector_dict[sensor_id] = sensor_id
-            return selector_dict
+        # Build list of options for selector (just entity IDs)
+        def build_selector_options(sensor_list):
+            """Build options list for selector."""
+            return [sensor_id for sensor_id in sensor_list]
         
-        # Build the schema
+        # Import selector
+        from homeassistant.helpers import selector
+        
+        # Build the schema using selectors that allow custom values
         schema = {}
         
         # Solar production (required)
         if solar_sensors:
-            solar_options = build_selector_dict(solar_sensors)
-            schema[vol.Required("solar_production", default=recommended_solar)] = vol.In(solar_options)
-            schema[vol.Optional("solar_production_custom", description="Or enter custom entity ID")] = str
+            schema[vol.Required("solar_production", default=recommended_solar)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=build_selector_options(solar_sensors),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
         
         # Battery SoC (required)
         if battery_soc:
-            # Get all SoC sensors for dropdown
-            soc_entities = {}
+            # Get all SoC sensors
+            soc_options = []
             for entry in entity_registry.entities.values():
                 if (entry.domain == "sensor"
                     and not entry.disabled_by
                     and (entry.device_class == "battery" or "soc" in entry.entity_id.lower())
                     and self.hass.states.get(entry.entity_id)):
-                    soc_entities[entry.entity_id] = f"{entry.entity_id} ({entry.original_name or entry.entity_id})"
+                    soc_options.append(entry.entity_id)
             
-            schema[vol.Required("battery_soc", default=battery_soc)] = vol.In(soc_entities)
-            schema[vol.Optional("battery_soc_custom", description="Or enter custom entity ID")] = str
+            schema[vol.Required("battery_soc", default=battery_soc)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=soc_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
         
-        # Battery charge (required - energy going INTO battery)
+        # Battery charge (required)
         if battery_charge:
-            battery_charge_options = build_selector_dict(battery_charge)
-            schema[vol.Required("battery_charge", default=recommended_battery_charge)] = vol.In(battery_charge_options)
-            schema[vol.Optional("battery_charge_custom", description="Or enter custom entity ID")] = str
+            schema[vol.Required("battery_charge", default=recommended_battery_charge)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=build_selector_options(battery_charge),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
         
-        # Battery discharge (required - energy coming OUT of battery)
+        # Battery discharge (required)
         if battery_discharge:
-            battery_discharge_options = build_selector_dict(battery_discharge)
-            schema[vol.Required("battery_discharge", default=recommended_battery_discharge)] = vol.In(battery_discharge_options)
-            schema[vol.Optional("battery_discharge_custom", description="Or enter custom entity ID")] = str
+            schema[vol.Required("battery_discharge", default=recommended_battery_discharge)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=build_selector_options(battery_discharge),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
         
         # Grid import (required)
         if grid_import:
-            grid_import_options = build_selector_dict(grid_import)
-            schema[vol.Required("grid_import", default=recommended_grid_import)] = vol.In(grid_import_options)
-            schema[vol.Optional("grid_import_custom", description="Or enter custom entity ID")] = str
+            schema[vol.Required("grid_import", default=recommended_grid_import)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=build_selector_options(grid_import),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
         
         # Grid export (required)
         if grid_export:
-            grid_export_options = build_selector_dict(grid_export)
-            schema[vol.Required("grid_export", default=recommended_grid_export)] = vol.In(grid_export_options)
-            schema[vol.Optional("grid_export_custom", description="Or enter custom entity ID")] = str
+            schema[vol.Required("grid_export", default=recommended_grid_export)] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=build_selector_options(grid_export),
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
         
-        # House load (optional - will be calculated from energy balance if not provided)
-        # Get all power sensors for dropdown
-        house_load_entities = {}
+        # House load (optional)
+        house_load_options = []
         for entry in entity_registry.entities.values():
             if entry.domain != "sensor" or entry.disabled_by:
                 continue
@@ -988,16 +1002,17 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 continue
             unit = state.attributes.get("unit_of_measurement", "").lower()
             if unit in ["kw", "w", "kwh", "wh"]:
-                unit_display = state.attributes.get("unit_of_measurement", "")
-                house_load_entities[entry.entity_id] = f"{entry.entity_id} [{unit_display}] ({entry.original_name or entry.entity_id})"
+                house_load_options.append(entry.entity_id)
         
-        if house_load_entities:
+        if house_load_options:
             current_house_load = self._detected_entities.get(CONF_HOUSE_LOAD_ENTITY)
-            if current_house_load:
-                schema[vol.Optional("house_load", default=current_house_load, description="OPTIONAL - Auto-calculated if not provided")] = vol.In(house_load_entities)
-            else:
-                schema[vol.Optional("house_load", description="OPTIONAL - Auto-calculated from: Solar + Battery Discharge + Grid Import - Battery Charge - Grid Export")] = vol.In(house_load_entities)
-            schema[vol.Optional("house_load_custom", description="Or enter custom entity ID")] = str
+            schema[vol.Optional("house_load", default=current_house_load, description="OPTIONAL - Auto-calculated if not provided")] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=house_load_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                    custom_value=True,
+                )
+            )
         
         return self.async_show_form(
             step_id="review",
