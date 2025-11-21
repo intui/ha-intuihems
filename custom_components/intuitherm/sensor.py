@@ -24,7 +24,6 @@ from .const import (
     SENSOR_TYPE_CONTROL_MODE,
     SENSOR_TYPE_MPC_SUCCESS_RATE,
     SENSOR_TYPE_MPC_SOLVE_TIME,
-    SENSOR_TYPE_MPC_RUNS_24H,
     SENSOR_TYPE_DRY_RUN_MODE,
     CONF_DETECTED_ENTITIES,
     CONF_DRY_RUN_MODE,
@@ -57,13 +56,10 @@ async def async_setup_entry(
         IntuiThermControlModeSensor(coordinator, entry),
         IntuiThermMPCSuccessRateSensor(coordinator, entry),
         IntuiThermMPCSolveTimeSensor(coordinator, entry),
-        IntuiThermMPCRuns24hSensor(coordinator, entry),
         IntuiThermDryRunModeSensor(coordinator, entry),
         # Forecast sensors
         IntuiThermConsumptionForecastSensor(coordinator, entry),
         IntuiThermSolarForecastSensor(coordinator, entry),
-        IntuiThermBatterySOCForecastSensor(coordinator, entry),
-        IntuiThermBatterySOCPlanSensor(coordinator, entry),
         IntuiThermNextControlSensor(coordinator, entry),
         IntuiThermPredictedCostSensor(coordinator, entry),
     ]
@@ -396,63 +392,6 @@ class IntuiThermMPCSolveTimeSensor(IntuiThermSensorBase):
         return attrs
 
 
-class IntuiThermMPCRuns24hSensor(IntuiThermSensorBase):
-    """Sensor for MPC run count in last 24h."""
-
-    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
-        super().__init__(
-            coordinator,
-            entry,
-            SENSOR_TYPE_MPC_RUNS_24H,
-            "MPC Runs (24h)",
-            "mdi:counter",
-        )
-        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-
-    @property
-    def native_value(self) -> int | None:
-        """Return number of MPC runs in the last hour."""
-        if not self.coordinator.data or self.coordinator.data is None:
-            return None
-
-        # Note: This sensor shows the 1-hour count from the metrics endpoint
-        # Period is shown in attributes
-        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
-
-        if not metrics_data or isinstance(metrics_data, Exception):
-            return None
-
-        # Access nested mpc_metrics structure
-        mpc_metrics = metrics_data.get("mpc_metrics", {})
-        total_runs = mpc_metrics.get("total_runs", 0)
-
-        return total_runs
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional state attributes."""
-        if not self.coordinator.data:
-            return {}
-
-        metrics_data = self.coordinator.data.get("metrics") if isinstance(self.coordinator.data, dict) else None
-
-        if not metrics_data or isinstance(metrics_data, Exception):
-            return {"error": str(metrics_data)}
-
-        # Access nested mpc_metrics structure
-        mpc_metrics = metrics_data.get("mpc_metrics", {})
-        
-        attrs = {
-            "successful": mpc_metrics.get("successful_runs", 0),
-            "failed": mpc_metrics.get("total_runs", 0) - mpc_metrics.get("successful_runs", 0),
-            "period": f"{metrics_data.get('period_hours', 1)} hour(s)",
-            "success_rate": round(mpc_metrics.get("success_rate", 0), 1),
-        }
-
-        return attrs
-
-
 class IntuiThermDryRunModeSensor(IntuiThermSensorBase):
     """Sensor showing if test/dry-run mode is active."""
 
@@ -714,13 +653,32 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
         if not control_data or isinstance(control_data, Exception):
             return "No plan available"
 
-        next_control = control_data.get("next_control")
+        controls = control_data.get("controls", [])
+        if not controls:
+            return "No upcoming control"
+
+        # Find the next control (first one with timestamp >= now)
+        from homeassistant.util import dt as dt_util
+        now = dt_util.now()
+        
+        next_control = None
+        for control in controls:
+            try:
+                timestamp_str = control.get("target_timestamp")
+                if timestamp_str:
+                    control_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    if control_time >= now:
+                        next_control = control
+                        break
+            except:
+                continue
+        
         if not next_control:
             return "No upcoming control"
 
-        mode = next_control.get("mode", "unknown")
-        power = next_control.get("power_kw", 0)
-        timestamp = next_control.get("timestamp")
+        mode = next_control.get("control_action", "unknown")
+        power = next_control.get("power_setpoint", 0)
+        timestamp = next_control.get("target_timestamp")
 
         # Format mode name
         mode_names = {
@@ -750,17 +708,31 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
         if not control_data or isinstance(control_data, Exception):
             return "mdi:battery-unknown"
 
-        next_control = control_data.get("next_control")
-        if not next_control:
+        controls = control_data.get("controls", [])
+        if not controls:
             return "mdi:battery"
 
-        mode = next_control.get("mode", "")
-        icons = {
-            "force_charge": "mdi:battery-charging",
-            "self_use": "mdi:battery-sync",
-            "backup": "mdi:battery-lock"
-        }
-        return icons.get(mode, "mdi:battery")
+        # Find next control
+        from homeassistant.util import dt as dt_util
+        now = dt_util.now()
+        
+        for control in controls:
+            try:
+                timestamp_str = control.get("target_timestamp")
+                if timestamp_str:
+                    control_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    if control_time >= now:
+                        mode = control.get("control_action", "")
+                        icons = {
+                            "force_charge": "mdi:battery-charging",
+                            "self_use": "mdi:battery-sync",
+                            "backup": "mdi:battery-lock"
+                        }
+                        return icons.get(mode, "mdi:battery")
+            except:
+                continue
+        
+        return "mdi:battery"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -772,21 +744,13 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
         if not control_data or isinstance(control_data, Exception):
             return {"error": str(control_data) if isinstance(control_data, Exception) else "No data"}
 
-        next_control = control_data.get("next_control", {})
+        controls = control_data.get("controls", [])
         
         attrs = {
-            "controls": control_data.get("controls", []),
-            "generated_at": control_data.get("generated_at"),
-            "optimization_cost_eur": control_data.get("optimization_cost_eur"),
+            "controls": controls[:10],  # Limit to next 10 controls to avoid huge attribute
+            "total_controls": len(controls),
+            "plan_generated_at": control_data.get("plan_generated_at"),
         }
-
-        if next_control:
-            attrs.update({
-                "next_mode": next_control.get("mode"),
-                "next_power_kw": next_control.get("power_kw"),
-                "next_timestamp": next_control.get("timestamp"),
-                "next_expected_soc": next_control.get("expected_soc"),
-            })
 
         return attrs
 

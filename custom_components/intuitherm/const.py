@@ -5,7 +5,7 @@ from typing import Final
 DOMAIN: Final = "intuitherm"
 
 # Version
-VERSION = "2025.11.20.9"
+VERSION = "2025.11.21.1"
 
 # Platforms
 PLATFORMS: Final = ["sensor", "switch"]
@@ -88,7 +88,6 @@ SENSOR_TYPE_OPTIMIZATION_STATUS: Final = "optimization_status"
 SENSOR_TYPE_CONTROL_MODE: Final = "control_mode"
 SENSOR_TYPE_MPC_SUCCESS_RATE: Final = "mpc_success_rate"
 SENSOR_TYPE_MPC_SOLVE_TIME: Final = "mpc_solve_time"
-SENSOR_TYPE_MPC_RUNS_24H: Final = "mpc_runs_24h"
 SENSOR_TYPE_DRY_RUN_MODE: Final = "dry_run_mode"
 
 # Switch types
