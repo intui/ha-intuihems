@@ -353,6 +353,19 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                     
                     timestamp = datetime.now(timezone.utc)
                     
+                    # Determine if sensor is cumulative based on attributes
+                    attributes = state.attributes
+                    unit = attributes.get("unit_of_measurement")
+                    device_class = attributes.get("device_class")
+                    state_class = attributes.get("state_class")
+                    
+                    # Logic matches config_flow.py _classify_sensor
+                    is_cumulative = (
+                        (unit and unit.lower() in ["kwh", "wh", "mwh"]) or
+                        device_class == "energy" or
+                        state_class == "total_increasing"
+                    )
+
                     # Send to backend using /sensors/data endpoint
                     await self._post_json(
                         "/api/v1/sensors/data",
@@ -365,6 +378,8 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                                     "value": value,
                                 }
                             ],
+                            "unit": unit,
+                            "is_cumulative": is_cumulative,
                         }
                     )
                     
@@ -529,6 +544,37 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                     _LOGGER.info("No valid historical data found for %s (skipping)", entity_id)
                     continue
                 
+                # Determine metadata from current state (preferred) or first historical state
+                current_state = self.hass.states.get(entity_id)
+                unit = None
+                is_cumulative = False
+                
+                if current_state:
+                    attributes = current_state.attributes
+                    unit = attributes.get("unit_of_measurement")
+                    device_class = attributes.get("device_class")
+                    state_class = attributes.get("state_class")
+                    is_cumulative = (
+                        (unit and unit.lower() in ["kwh", "wh", "mwh"]) or
+                        device_class == "energy" or
+                        state_class == "total_increasing"
+                    )
+                elif states:
+                    # Fallback to historical attributes
+                    for state in states:
+                        if state.attributes:
+                            attributes = state.attributes
+                            unit = attributes.get("unit_of_measurement")
+                            device_class = attributes.get("device_class")
+                            state_class = attributes.get("state_class")
+                            is_cumulative = (
+                                (unit and unit.lower() in ["kwh", "wh", "mwh"]) or
+                                device_class == "energy" or
+                                state_class == "total_increasing"
+                            )
+                            if unit: # Found valid attributes
+                                break
+
                 # Send in smaller batches (25 readings per batch)
                 batch_size = 25
                 _LOGGER.info("Backfilling %d readings for %s in %d batches", len(readings), entity_id, (len(readings) + batch_size - 1) // batch_size)
@@ -543,6 +589,8 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                                 "sensor_type": sensor_type,
                                 "entity_id": entity_id,
                                 "readings": batch,
+                                "unit": unit,
+                                "is_cumulative": is_cumulative,
                             },
                             timeout=90,  # 90 second timeout
                         )
