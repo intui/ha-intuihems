@@ -695,54 +695,43 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Get sensor selections (single field per sensor, supports custom text)
+            # Get the 3 required sensor selections
             solar_production = user_input.get("solar_production", "").strip()
             battery_soc = user_input.get("battery_soc", "").strip()
-            battery_charge = user_input.get("battery_charge", "").strip()
-            battery_discharge = user_input.get("battery_discharge", "").strip()
-            grid_import = user_input.get("grid_import", "").strip()
-            grid_export = user_input.get("grid_export", "").strip()
+            house_load = user_input.get("house_load", "").strip()
             
-            # Validate that all required sensors are provided
+            # Validate all required sensors are provided
             if not solar_production:
                 errors["solar_production"] = "Solar production sensor is required"
             if not battery_soc:
                 errors["battery_soc"] = "Battery SoC sensor is required"
-            
-            # Optional sensors - no validation needed
-            
-            # Get house load (optional)
-            house_load = user_input.get("house_load", "").strip() or None
+            if not house_load:
+                errors["house_load"] = "House load sensor is required"
             
             # Validate entities exist
             if not errors:
                 for sensor_id, field_name in [
                     (solar_production, "solar_production"),
                     (battery_soc, "battery_soc"),
-                    (battery_charge, "battery_charge"),
-                    (battery_discharge, "battery_discharge"),
-                    (grid_import, "grid_import"),
-                    (grid_export, "grid_export"),
-                    (house_load, "house_load"),  # Optional
+                    (house_load, "house_load"),
                 ]:
-                    if sensor_id and not self.hass.states.get(sensor_id):
+                    if not self.hass.states.get(sensor_id):
                         errors[field_name] = f"Entity '{sensor_id}' not found in Home Assistant"
             
             if not errors:
-                # Store the final selected sensors
+                # Store the final selected sensors (simplified - only 3 required sensors)
                 self._detected_entities[CONF_SOLAR_POWER_ENTITY] = solar_production
                 self._detected_entities[CONF_BATTERY_SOC_ENTITY] = battery_soc
-                # Store as lists for coordinator compatibility
-                self._detected_entities[CONF_BATTERY_CHARGE_SENSORS] = [battery_charge] if battery_charge else []
-                self._detected_entities[CONF_BATTERY_DISCHARGE_SENSORS] = [battery_discharge] if battery_discharge else []
-                self._detected_entities[CONF_GRID_IMPORT_SENSORS] = [grid_import] if grid_import else []
-                self._detected_entities[CONF_GRID_EXPORT_SENSORS] = [grid_export] if grid_export else []
-                # Store house load if provided (optional - will be calculated from energy balance if not provided)
-                if house_load:
-                    self._detected_entities[CONF_HOUSE_LOAD_ENTITY] = house_load
-                    _LOGGER.info("House load sensor configured: %s", house_load)
-                else:
-                    _LOGGER.info("No house load sensor - will auto-calculate from energy balance")
+                self._detected_entities[CONF_HOUSE_LOAD_ENTITY] = house_load
+                
+                # Store empty lists for optional sensors (for coordinator compatibility)
+                self._detected_entities[CONF_BATTERY_CHARGE_SENSORS] = []
+                self._detected_entities[CONF_BATTERY_DISCHARGE_SENSORS] = []
+                self._detected_entities[CONF_GRID_IMPORT_SENSORS] = []
+                self._detected_entities[CONF_GRID_EXPORT_SENSORS] = []
+                
+                _LOGGER.info("Sensors configured: solar=%s, battery_soc=%s, house_load=%s",
+                             solar_production, battery_soc, house_load)
                 
                 # Proceed to pricing configuration
                 return await self.async_step_pricing()
@@ -823,15 +812,15 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="pricing",
             data_schema=vol.Schema({
-                vol.Required(CONF_BATTERY_CAPACITY, default=DEFAULT_BATTERY_CAPACITY, description="Battery capacity (kWh)"): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
-                vol.Required(CONF_BATTERY_MAX_POWER, default=DEFAULT_BATTERY_MAX_POWER, description="Battery max power (kW)"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0)),
-                vol.Required(CONF_EPEX_MARKUP, default=DEFAULT_EPEX_MARKUP): vol.Coerce(float),
-                vol.Required(CONF_GRID_EXPORT_PRICE, default=DEFAULT_GRID_EXPORT_PRICE): vol.Coerce(float),
-                vol.Optional(CONF_DRY_RUN_MODE, default=False): bool,
+                vol.Required(CONF_BATTERY_CAPACITY, default=DEFAULT_BATTERY_CAPACITY, description="Battery usable capacity in kWh (e.g., 10.0)"): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
+                vol.Required(CONF_BATTERY_MAX_POWER, default=DEFAULT_BATTERY_MAX_POWER, description="Battery max charge/discharge power in kW (e.g., 5.0)"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0)),
+                vol.Required(CONF_EPEX_MARKUP, default=DEFAULT_EPEX_MARKUP, description="Markup added to EPEX spot price in €/kWh (e.g., 0.10)"): vol.Coerce(float),
+                vol.Required(CONF_GRID_EXPORT_PRICE, default=DEFAULT_GRID_EXPORT_PRICE, description="Price for exporting to grid in €/kWh (e.g., 0.08)"): vol.Coerce(float),
+                vol.Optional(CONF_DRY_RUN_MODE, default=False, description="Dry run mode (recommendations only, no battery control)"): bool,
             }),
             errors=errors,
             description_placeholders={
-                "dry_run_info": "Enable demo mode to run optimization without sending commands to your battery. Perfect for testing!"
+                "dry_run_info": "Enable dry run mode to see optimization recommendations without controlling your battery. Perfect for testing!"
             },
         )
 
@@ -880,8 +869,26 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 share_with_community=True,  # User can opt-out in settings later
             )
 
+    def _is_cumulative_sensor(self, entity_id: str) -> bool:
+        """Check if sensor is cumulative (kWh, total_increasing)."""
+        state = self.hass.states.get(entity_id)
+        if not state:
+            return False
+        
+        attrs = state.attributes
+        unit = attrs.get("unit_of_measurement", "").lower()
+        device_class = attrs.get("device_class")
+        state_class = attrs.get("state_class")
+        
+        return (
+            device_class == "energy" or
+            state_class == "total_increasing" or
+            unit in ["kwh", "wh", "mwh"] or
+            "total" in entity_id.lower()
+        )
+    
     async def _show_review_form(self) -> config_entries.FlowResult:
-        """Show the review & select form with recommended sensors."""
+        """Show the review & select form with recommended sensors (CUMULATIVE ONLY)."""
         entity_registry = er.async_get(self.hass)
         
         # Get all detected sensors for dropdowns
@@ -921,15 +928,26 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Build the schema using selectors that allow custom values
         schema = {}
         
-        # Solar production (required)
+        # Solar production (required) - ONLY cumulative kWh sensors
         if solar_sensors:
-            schema[vol.Required("solar_production")] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=build_selector_options(solar_sensors),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
+            # Filter to only cumulative sensors
+            cumulative_solar = [
+                s for s in solar_sensors
+                if self._is_cumulative_sensor(s)
+            ]
+            if cumulative_solar:
+                schema[vol.Required(
+                    "solar_production",
+                    description="Required: Cumulative solar energy sensor (kWh, total_increasing)"
+                )] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=build_selector_options(cumulative_solar),
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        custom_value=True,
+                    )
                 )
-            )
+            else:
+                _LOGGER.warning("No cumulative solar sensors found")
         
         # Battery SoC (required)
         if battery_soc:
@@ -950,47 +968,7 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
             )
         
-        # Battery charge (optional)
-        if battery_charge:
-            schema[vol.Optional("battery_charge")] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=build_selector_options(battery_charge),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
-                )
-            )
-        
-        # Battery discharge (optional)
-        if battery_discharge:
-            schema[vol.Optional("battery_discharge")] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=build_selector_options(battery_discharge),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
-                )
-            )
-        
-        # Grid import (optional)
-        if grid_import:
-            schema[vol.Optional("grid_import")] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=build_selector_options(grid_import),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
-                )
-            )
-        
-        # Grid export (optional)
-        if grid_export:
-            schema[vol.Optional("grid_export")] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=build_selector_options(grid_export),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
-                )
-            )
-        
-        # House load (optional)
+        # House load (required) - ONLY cumulative kWh sensors
         house_load_options = []
         for entry in entity_registry.entities.values():
             if entry.domain != "sensor" or entry.disabled_by:
@@ -998,13 +976,28 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             state = self.hass.states.get(entry.entity_id)
             if not state:
                 continue
-            unit = state.attributes.get("unit_of_measurement", "").lower()
-            if unit in ["kw", "w", "kwh", "wh"]:
+            
+            # Only cumulative energy sensors
+            attrs = state.attributes
+            unit = attrs.get("unit_of_measurement", "").lower()
+            device_class = attrs.get("device_class")
+            state_class = attrs.get("state_class")
+            
+            is_cumulative = (
+                device_class == "energy" or
+                state_class == "total_increasing" or
+                unit in ["kwh", "wh"] or
+                "total" in entry.entity_id.lower()
+            )
+            
+            if is_cumulative and any(x in entry.entity_id.lower() for x in ["house", "load", "home", "consumption"]):
                 house_load_options.append(entry.entity_id)
         
         if house_load_options:
-            current_house_load = self._detected_entities.get(CONF_HOUSE_LOAD_ENTITY)
-            schema[vol.Optional("house_load", description="OPTIONAL - Auto-calculated if not provided")] = selector.SelectSelector(
+            schema[vol.Required(
+                "house_load",
+                description="Required: Cumulative house energy sensor (kWh, total_increasing)"
+            )] = selector.SelectSelector(
                 selector.SelectSelectorConfig(
                     options=house_load_options,
                     mode=selector.SelectSelectorMode.DROPDOWN,
