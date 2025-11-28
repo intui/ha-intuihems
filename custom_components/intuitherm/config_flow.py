@@ -1914,6 +1914,21 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 default=current_config.get(CONF_BATTERY_MAX_POWER, DEFAULT_BATTERY_MAX_POWER)
             ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0)),
         }
+        
+        # Battery control entities (for actual battery control via MPC)
+        # Note: These are optional if running in demo/dry-run mode
+        current_mode_select = detected_entities.get(CONF_BATTERY_MODE_SELECT, "")
+        current_charge_power = detected_entities.get(CONF_BATTERY_CHARGE_POWER, "")
+        current_discharge_power = detected_entities.get(CONF_BATTERY_DISCHARGE_POWER, "")
+        
+        schema[vol.Optional(CONF_BATTERY_MODE_SELECT, default=current_mode_select, description="Battery Mode Select (optional in demo mode)")] = str
+        schema[vol.Optional(CONF_BATTERY_CHARGE_POWER, default=current_charge_power, description="Battery Charge Power Control (optional in demo mode)")] = str
+        schema[vol.Optional(CONF_BATTERY_DISCHARGE_POWER, default=current_discharge_power, description="Battery Discharge Power Control (optional in demo mode)")] = str
+        schema[vol.Optional(
+            CONF_BATTERY_CHARGE_MAX_POWER,
+            default=current_config.get(CONF_BATTERY_CHARGE_MAX_POWER, DEFAULT_BATTERY_CHARGE_MAX_POWER),
+            description="Maximum charging power (kW)"
+        )] = vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0))
 
         # Add entity selectors with values from detected_entities
         # Always show fields even if no entities detected (allow custom input)
@@ -2034,22 +2049,6 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             schema[vol.Optional("battery_discharge", default=battery_discharge_sensors[0] if battery_discharge_sensors else "", description="OPTIONAL - Battery Discharge Sensor")] = str
             schema[vol.Optional("grid_import", default=grid_import_sensors[0] if grid_import_sensors else "", description="OPTIONAL - Grid Import Sensor")] = str
             schema[vol.Optional("grid_export", default=grid_export_sensors[0] if grid_export_sensors else "", description="OPTIONAL - Grid Export Sensor")] = str
-        
-        # Battery control entities (always show, for both dropdowns and text inputs)
-        current_mode_select = detected_entities.get(CONF_BATTERY_MODE_SELECT, "")
-        current_charge_power = detected_entities.get(CONF_BATTERY_CHARGE_POWER, "")
-        current_discharge_power = detected_entities.get(CONF_BATTERY_DISCHARGE_POWER, "")
-        
-        schema[vol.Optional(CONF_BATTERY_MODE_SELECT, default=current_mode_select, description="OPTIONAL - Battery Mode Select Entity")] = str
-        schema[vol.Optional(CONF_BATTERY_CHARGE_POWER, default=current_charge_power, description="OPTIONAL - Battery Charge Power Entity")] = str
-        schema[vol.Optional(CONF_BATTERY_DISCHARGE_POWER, default=current_discharge_power, description="OPTIONAL - Battery Discharge Power Entity")] = str
-        
-        # Battery charge max power configuration
-        schema[vol.Optional(
-            CONF_BATTERY_CHARGE_MAX_POWER,
-            default=current_config.get(CONF_BATTERY_CHARGE_MAX_POWER, DEFAULT_BATTERY_CHARGE_MAX_POWER),
-            description="Maximum charging power (kW)"
-        )] = vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0))
 
         return self.async_show_form(
             step_id="init",
