@@ -44,13 +44,27 @@ CONF_GRID_IMPORT_SENSORS: Final = "grid_import_sensors"  # List of grid import s
 CONF_GRID_EXPORT_SENSORS: Final = "grid_export_sensors"  # List of grid export sensors
 
 # Battery control entities
+# Battery control configuration
 CONF_BATTERY_MODE_SELECT: Final = "battery_mode_select"  # Battery work mode select entity
 CONF_BATTERY_CHARGE_POWER: Final = "battery_charge_power"  # Battery charge power number entity  
 CONF_BATTERY_DISCHARGE_POWER: Final = "battery_discharge_power"  # Battery discharge power number entity
 
+# Battery control modes (standardized across inverters)
+BATTERY_MODE_SELF_USE: Final = "self_use"
+BATTERY_MODE_BACKUP: Final = "backup"
+BATTERY_MODE_FORCE_CHARGE: Final = "force_charge"
+
+# Battery mode display names
+BATTERY_MODE_NAMES: Final = {
+    BATTERY_MODE_SELF_USE: "Self Use",
+    BATTERY_MODE_BACKUP: "Backup",
+    BATTERY_MODE_FORCE_CHARGE: "Force Charge",
+}
+
 # Battery specifications
 CONF_BATTERY_CAPACITY: Final = "battery_capacity_kwh"  # Battery capacity in kWh
 CONF_BATTERY_MAX_POWER: Final = "battery_max_power_kw"  # Battery max charge/discharge power in kW
+CONF_BATTERY_CHARGE_MAX_POWER: Final = "battery_charge_max_power_kw"  # Max charging power in kW
 
 # House load configuration
 CONF_HOUSE_LOAD_CALC_MODE: Final = "house_load_calc_mode"  # "auto" or "manual"
@@ -67,6 +81,7 @@ DEFAULT_SERVICE_URL: Final = "https://api.intuihems.de"
 DEFAULT_UPDATE_INTERVAL: Final = 110  # seconds
 DEFAULT_BATTERY_CAPACITY: Final = 10.0  # kWh
 DEFAULT_BATTERY_MAX_POWER: Final = 3.0  # kW
+DEFAULT_BATTERY_CHARGE_MAX_POWER: Final = 3.0  # kW
 DEFAULT_EPEX_MARKUP: Final = 0.10  # €0.10/kWh markup
 DEFAULT_GRID_EXPORT_PRICE: Final = 0.08  # €0.08/kWh feed-in tariff
 

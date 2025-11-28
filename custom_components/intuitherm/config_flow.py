@@ -35,6 +35,7 @@ from .const import (
     CONF_BATTERY_DISCHARGE_POWER,
     CONF_BATTERY_CAPACITY,
     CONF_BATTERY_MAX_POWER,
+    CONF_BATTERY_CHARGE_MAX_POWER,
     CONF_HOUSE_LOAD_CALC_MODE,
     CONF_EPEX_MARKUP,
     CONF_GRID_EXPORT_PRICE,
@@ -46,6 +47,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_BATTERY_CAPACITY,
     DEFAULT_BATTERY_MAX_POWER,
+    DEFAULT_BATTERY_CHARGE_MAX_POWER,
     DEFAULT_EPEX_MARKUP,
     DEFAULT_GRID_EXPORT_PRICE,
     ENDPOINT_UPDATE_CONFIG,
@@ -1819,6 +1821,14 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 detected_entities[CONF_GRID_IMPORT_SENSORS] = [user_input["grid_import"]] if user_input.get("grid_import") else []
                 detected_entities[CONF_GRID_EXPORT_SENSORS] = [user_input["grid_export"]] if user_input.get("grid_export") else []
                 
+                # Update battery control entities
+                if user_input.get(CONF_BATTERY_MODE_SELECT):
+                    detected_entities[CONF_BATTERY_MODE_SELECT] = user_input[CONF_BATTERY_MODE_SELECT]
+                if user_input.get(CONF_BATTERY_CHARGE_POWER):
+                    detected_entities[CONF_BATTERY_CHARGE_POWER] = user_input[CONF_BATTERY_CHARGE_POWER]
+                if user_input.get(CONF_BATTERY_DISCHARGE_POWER):
+                    detected_entities[CONF_BATTERY_DISCHARGE_POWER] = user_input[CONF_BATTERY_DISCHARGE_POWER]
+                
                 # Build options dict with updated sensors and battery specs
                 # Note: Service URL and API key are preserved from original config (not user-editable)
                 options_data = {
@@ -1826,6 +1836,7 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_DETECTED_ENTITIES: detected_entities,
                     CONF_BATTERY_CAPACITY: user_input.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
                     CONF_BATTERY_MAX_POWER: user_input.get(CONF_BATTERY_MAX_POWER, DEFAULT_BATTERY_MAX_POWER),
+                    CONF_BATTERY_CHARGE_MAX_POWER: user_input.get(CONF_BATTERY_CHARGE_MAX_POWER, DEFAULT_BATTERY_CHARGE_MAX_POWER),
                 }
                 
                 # Send battery configuration to backend
@@ -2023,6 +2034,22 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             schema[vol.Optional("battery_discharge", default=battery_discharge_sensors[0] if battery_discharge_sensors else "", description="OPTIONAL - Battery Discharge Sensor")] = str
             schema[vol.Optional("grid_import", default=grid_import_sensors[0] if grid_import_sensors else "", description="OPTIONAL - Grid Import Sensor")] = str
             schema[vol.Optional("grid_export", default=grid_export_sensors[0] if grid_export_sensors else "", description="OPTIONAL - Grid Export Sensor")] = str
+        
+        # Battery control entities (always show, for both dropdowns and text inputs)
+        current_mode_select = detected_entities.get(CONF_BATTERY_MODE_SELECT, "")
+        current_charge_power = detected_entities.get(CONF_BATTERY_CHARGE_POWER, "")
+        current_discharge_power = detected_entities.get(CONF_BATTERY_DISCHARGE_POWER, "")
+        
+        schema[vol.Optional(CONF_BATTERY_MODE_SELECT, default=current_mode_select, description="OPTIONAL - Battery Mode Select Entity")] = str
+        schema[vol.Optional(CONF_BATTERY_CHARGE_POWER, default=current_charge_power, description="OPTIONAL - Battery Charge Power Entity")] = str
+        schema[vol.Optional(CONF_BATTERY_DISCHARGE_POWER, default=current_discharge_power, description="OPTIONAL - Battery Discharge Power Entity")] = str
+        
+        # Battery charge max power configuration
+        schema[vol.Optional(
+            CONF_BATTERY_CHARGE_MAX_POWER,
+            default=current_config.get(CONF_BATTERY_CHARGE_MAX_POWER, DEFAULT_BATTERY_CHARGE_MAX_POWER),
+            description="Maximum charging power (kW)"
+        )] = vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0))
 
         return self.async_show_form(
             step_id="init",
