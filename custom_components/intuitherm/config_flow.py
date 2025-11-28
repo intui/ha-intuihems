@@ -1905,8 +1905,11 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
         }
 
         # Add entity selectors with values from detected_entities
+        # Always show fields even if no entities detected (allow custom input)
+        
+        # Battery SOC
+        current_soc = detected_entities.get(CONF_BATTERY_SOC_ENTITY)
         if soc_entities:
-            current_soc = detected_entities.get(CONF_BATTERY_SOC_ENTITY)
             # Ensure the current value is in the list, otherwise add it
             if current_soc and current_soc not in soc_entities:
                 soc_entities[current_soc] = f"{current_soc} (configured)"
@@ -1918,7 +1921,11 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 schema[vol.Optional(CONF_BATTERY_SOC_ENTITY)] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(soc_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
+        else:
+            # No SOC entities found, show text input
+            schema[vol.Optional(CONF_BATTERY_SOC_ENTITY, default=current_soc or "")] = str
 
+        # Power/Energy sensors
         if power_entities:
             # Solar Power
             current_solar = detected_entities.get(CONF_SOLAR_POWER_ENTITY)
@@ -2001,6 +2008,21 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 schema[vol.Optional("grid_export", description="OPTIONAL - Grid Export Sensor")] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(power_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
+        else:
+            # No power entities found, show text inputs
+            current_solar = detected_entities.get(CONF_SOLAR_POWER_ENTITY)
+            current_load = detected_entities.get(CONF_HOUSE_LOAD_ENTITY)
+            battery_charge_sensors = detected_entities.get(CONF_BATTERY_CHARGE_SENSORS, [])
+            battery_discharge_sensors = detected_entities.get(CONF_BATTERY_DISCHARGE_SENSORS, [])
+            grid_import_sensors = detected_entities.get(CONF_GRID_IMPORT_SENSORS, [])
+            grid_export_sensors = detected_entities.get(CONF_GRID_EXPORT_SENSORS, [])
+            
+            schema[vol.Optional(CONF_SOLAR_POWER_ENTITY, default=current_solar or "")] = str
+            schema[vol.Optional(CONF_HOUSE_LOAD_ENTITY, default=current_load or "", description="OPTIONAL - Auto-calculated if not provided")] = str
+            schema[vol.Optional("battery_charge", default=battery_charge_sensors[0] if battery_charge_sensors else "", description="OPTIONAL - Battery Charge Sensor")] = str
+            schema[vol.Optional("battery_discharge", default=battery_discharge_sensors[0] if battery_discharge_sensors else "", description="OPTIONAL - Battery Discharge Sensor")] = str
+            schema[vol.Optional("grid_import", default=grid_import_sensors[0] if grid_import_sensors else "", description="OPTIONAL - Grid Import Sensor")] = str
+            schema[vol.Optional("grid_export", default=grid_export_sensors[0] if grid_export_sensors else "", description="OPTIONAL - Grid Export Sensor")] = str
 
         return self.async_show_form(
             step_id="init",
