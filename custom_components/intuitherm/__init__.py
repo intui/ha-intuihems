@@ -38,14 +38,24 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up IntuiTherm from a config entry."""
-    # Merge entry.data and entry.options (options take precedence)
-    config = {**entry.data, **entry.options}
+    try:
+        _LOGGER.error("=" * 80)
+        _LOGGER.error("🚀 INTUITHERM ASYNC_SETUP_ENTRY CALLED")
+        _LOGGER.error("Entry ID: %s", entry.entry_id)
+        _LOGGER.error("Entry data keys: %s", list(entry.data.keys()))
+        _LOGGER.error("=" * 80)
+        
+        # Merge entry.data and entry.options (options take precedence)
+        config = {**entry.data, **entry.options}
 
-    _LOGGER.info(
-        "Setting up IntuiTherm integration v%s for service at %s",
-        VERSION,
-        config[CONF_SERVICE_URL]
-    )
+        _LOGGER.info(
+            "Setting up IntuiTherm integration v%s for service at %s",
+            VERSION,
+            config.get(CONF_SERVICE_URL, "MISSING")
+        )
+    except Exception as e:
+        _LOGGER.error("❌ CRITICAL ERROR in async_setup_entry start: %s", e, exc_info=True)
+        return False
 
     # Get aiohttp session
     session = async_get_clientsession(hass)
