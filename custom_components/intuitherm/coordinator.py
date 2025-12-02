@@ -401,6 +401,7 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
 
     async def _backfill_historic_data_background(self) -> None:
         """Background task wrapper for historic data backfill."""
+        _LOGGER.info("📦 Background backfill task started")
         try:
             success = await self._backfill_historic_data()
             if success:

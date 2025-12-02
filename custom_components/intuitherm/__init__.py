@@ -63,7 +63,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     # Fetch initial data
+    _LOGGER.info("🚀 Starting first coordinator refresh (will trigger sensor registration and backfill)...")
     await coordinator.async_config_entry_first_refresh()
+    _LOGGER.info("✅ First coordinator refresh complete")
 
     # Store coordinator
     hass.data.setdefault(DOMAIN, {})
