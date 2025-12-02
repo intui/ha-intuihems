@@ -939,63 +939,8 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Build the schema using selectors that allow custom values
         schema = {}
         
-        # Solar production (required) - ONLY cumulative kWh sensors
-        cumulative_solar = []
-        if solar_sensors:
-            # Filter to only cumulative sensors
-            cumulative_solar = [
-                s for s in solar_sensors
-                if self._is_cumulative_sensor(s)
-            ]
-        
-        if cumulative_solar:
-            schema[vol.Required(
-                "solar_production",
-                description="Required: Cumulative solar energy sensor (kWh, total_increasing)"
-            )] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=build_selector_options(cumulative_solar),
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
-                )
-            )
-        else:
-            # No cumulative sensors found - show text input for manual entry
-            _LOGGER.warning("No cumulative solar sensors auto-detected, showing text input")
-            schema[vol.Required(
-                "solar_production",
-                description="Required: Enter solar energy sensor entity ID (kWh, total_increasing)"
-            )] = str
-        
-        # Battery SoC (required)
-        soc_options = []
-        if battery_soc:
-            # Get all SoC sensors
-            for entry in entity_registry.entities.values():
-                if (entry.domain == "sensor"
-                    and not entry.disabled_by
-                    and (entry.device_class == "battery" or "soc" in entry.entity_id.lower())
-                    and self.hass.states.get(entry.entity_id)):
-                    soc_options.append(entry.entity_id)
-        
-        if soc_options:
-            schema[vol.Required("battery_soc")] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=soc_options,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
-                )
-            )
-        else:
-            # No SoC sensors found - show text input
-            _LOGGER.warning("No battery SoC sensors auto-detected, showing text input")
-            schema[vol.Required(
-                "battery_soc",
-                description="Required: Enter battery SoC sensor entity ID (%)"
-            )] = str
-        
-        # House load (required) - ONLY cumulative kWh sensors
-        house_load_options = []
+        # Solar production (required) - Scan ALL cumulative kWh sensors
+        all_cumulative_energy = []
         for entry in entity_registry.entities.values():
             if entry.domain != "sensor" or entry.disabled_by:
                 continue
@@ -1003,40 +948,84 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not state:
                 continue
             
-            # Only cumulative energy sensors
             attrs = state.attributes
             unit = attrs.get("unit_of_measurement", "").lower()
             device_class = attrs.get("device_class")
             state_class = attrs.get("state_class")
             
+            # Check if cumulative energy sensor
             is_cumulative = (
                 device_class == "energy" or
                 state_class == "total_increasing" or
-                unit in ["kwh", "wh"] or
-                "total" in entry.entity_id.lower()
+                unit in ["kwh", "wh"]
             )
             
-            if is_cumulative and any(x in entry.entity_id.lower() for x in ["house", "load", "home", "consumption"]):
-                house_load_options.append(entry.entity_id)
+            if is_cumulative:
+                all_cumulative_energy.append(entry.entity_id)
         
-        if house_load_options:
-            schema[vol.Required(
-                "house_load",
-                description="Required: Cumulative house energy sensor (kWh, total_increasing)"
-            )] = selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=house_load_options,
-                    mode=selector.SelectSelectorMode.DROPDOWN,
-                    custom_value=True,
-                )
+        # Always show dropdown with all cumulative energy sensors for solar
+        _LOGGER.info("Found %d total cumulative energy sensors for solar selection", len(all_cumulative_energy))
+        schema[vol.Required(
+            "solar_production",
+            description="Required: Cumulative solar energy sensor (kWh, total_increasing)"
+        )] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=build_selector_options(all_cumulative_energy) if all_cumulative_energy else [],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                custom_value=True,
             )
-        else:
-            # No house load sensors found - show text input
-            _LOGGER.warning("No house load sensors auto-detected, showing text input")
-            schema[vol.Required(
-                "house_load",
-                description="Required: Enter house energy sensor entity ID (kWh, total_increasing)"
-            )] = str
+        )
+        
+        # Battery SoC (required) - Scan ALL % sensors
+        all_soc_sensors = []
+        for entry in entity_registry.entities.values():
+            if entry.domain != "sensor" or entry.disabled_by:
+                continue
+            state = self.hass.states.get(entry.entity_id)
+            if not state:
+                continue
+            
+            attrs = state.attributes
+            unit = attrs.get("unit_of_measurement", "").lower()
+            device_class = attrs.get("device_class")
+            
+            # Check if battery/SoC sensor (% unit)
+            is_soc = (
+                device_class == "battery" or
+                unit == "%" or
+                "soc" in entry.entity_id.lower() or
+                "battery" in entry.entity_id.lower()
+            )
+            
+            if is_soc and unit == "%":  # Require % unit for SoC
+                all_soc_sensors.append(entry.entity_id)
+        
+        # Always show dropdown with all % sensors for battery SoC
+        _LOGGER.info("Found %d total battery SoC sensors (%%)", len(all_soc_sensors))
+        schema[vol.Required(
+            "battery_soc",
+            description="Required: Battery State of Charge sensor (%)"
+        )] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=all_soc_sensors if all_soc_sensors else [],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                custom_value=True,
+            )
+        )
+        
+        # House load (required) - Use same cumulative energy list as solar
+        # (user can select any cumulative kWh sensor for house load)
+        _LOGGER.info("Offering %d cumulative energy sensors for house load selection", len(all_cumulative_energy))
+        schema[vol.Required(
+            "house_load",
+            description="Required: Cumulative house energy sensor (kWh, total_increasing)"
+        )] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=build_selector_options(all_cumulative_energy) if all_cumulative_energy else [],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                custom_value=True,
+            )
+        )
         
         return self.async_show_form(
             step_id="review",
