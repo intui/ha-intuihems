@@ -2181,6 +2181,14 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 if user_input.get(CONF_BATTERY_CHARGE_POWER):
                     detected_entities[CONF_BATTERY_CHARGE_POWER] = user_input[CONF_BATTERY_CHARGE_POWER]
                 
+                # Update mode mappings
+                if user_input.get(CONF_MODE_SELF_USE):
+                    detected_entities[CONF_MODE_SELF_USE] = user_input[CONF_MODE_SELF_USE]
+                if user_input.get(CONF_MODE_BACKUP):
+                    detected_entities[CONF_MODE_BACKUP] = user_input[CONF_MODE_BACKUP]
+                if user_input.get(CONF_MODE_FORCE_CHARGE):
+                    detected_entities[CONF_MODE_FORCE_CHARGE] = user_input[CONF_MODE_FORCE_CHARGE]
+                
                 # Build options dict with updated sensors and battery specs
                 # Note: Service URL and API key are preserved from original config (not user-editable)
                 options_data = {
@@ -2421,6 +2429,99 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 custom_value=True,
             )
         )
+        
+        # Add mode mapping fields if battery mode select entity is configured
+        mode_select_entity = detected_entities.get(CONF_BATTERY_MODE_SELECT)
+        if mode_select_entity:
+            # Get available mode options from the entity
+            available_options = []
+            state = self.hass.states.get(mode_select_entity)
+            if state and state.attributes:
+                available_options = state.attributes.get("options", [])
+            
+            # Get current mode mappings
+            current_self_use = detected_entities.get(CONF_MODE_SELF_USE, "")
+            current_backup = detected_entities.get(CONF_MODE_BACKUP, "")
+            current_force_charge = detected_entities.get(CONF_MODE_FORCE_CHARGE, "")
+            
+            # Auto-detect defaults if not already configured
+            if not current_self_use and available_options:
+                for option in available_options:
+                    option_lower = option.lower()
+                    if "self" in option_lower and "use" in option_lower:
+                        current_self_use = option
+                        break
+            
+            if not current_backup and available_options:
+                for option in available_options:
+                    if "backup" in option.lower():
+                        current_backup = option
+                        break
+            
+            if not current_force_charge and available_options:
+                for option in available_options:
+                    option_lower = option.lower()
+                    if "force" in option_lower and "charge" in option_lower:
+                        current_force_charge = option
+                        break
+            
+            # Add mode mapping fields
+            if available_options:
+                schema[vol.Required(
+                    CONF_MODE_SELF_USE,
+                    default=current_self_use or "",
+                    description=f"Select the mode option for '{BATTERY_MODE_NAMES[BATTERY_MODE_SELF_USE]}'"
+                )] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=available_options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        custom_value=True,
+                    )
+                )
+                
+                schema[vol.Required(
+                    CONF_MODE_BACKUP,
+                    default=current_backup or "",
+                    description=f"Select the mode option for '{BATTERY_MODE_NAMES[BATTERY_MODE_BACKUP]}'"
+                )] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=available_options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        custom_value=True,
+                    )
+                )
+                
+                schema[vol.Required(
+                    CONF_MODE_FORCE_CHARGE,
+                    default=current_force_charge or "",
+                    description=f"Select the mode option for '{BATTERY_MODE_NAMES[BATTERY_MODE_FORCE_CHARGE]}'"
+                )] = selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=available_options,
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                        custom_value=True,
+                    )
+                )
+            else:
+                # Fallback to text inputs if options can't be fetched
+                schema[vol.Required(
+                    CONF_MODE_SELF_USE,
+                    default=current_self_use or "Self Use",
+                    description=f"Enter the exact option value for '{BATTERY_MODE_NAMES[BATTERY_MODE_SELF_USE]}'"
+                )] = str
+                
+                schema[vol.Required(
+                    CONF_MODE_BACKUP,
+                    default=current_backup or "Backup",
+                    description=f"Enter the exact option value for '{BATTERY_MODE_NAMES[BATTERY_MODE_BACKUP]}'"
+                )] = str
+                
+                schema[vol.Required(
+                    CONF_MODE_FORCE_CHARGE,
+                    default=current_force_charge or "Force Charge",
+                    description=f"Enter the exact option value for '{BATTERY_MODE_NAMES[BATTERY_MODE_FORCE_CHARGE]}'"
+                )] = str
+
 
         return self.async_show_form(
             step_id="init",
