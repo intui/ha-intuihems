@@ -15,7 +15,13 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_DRY_RUN_MODE, CONF_DETECTED_ENTITIES
+from .const import (
+    CONF_DRY_RUN_MODE,
+    CONF_DETECTED_ENTITIES,
+    CONF_MODE_SELF_USE,
+    CONF_MODE_BACKUP,
+    CONF_MODE_FORCE_CHARGE,
+)
 
 if TYPE_CHECKING:
     from .coordinator import IntuiThermDataUpdateCoordinator
@@ -50,9 +56,15 @@ class BatteryControlExecutor:
         self.config = config
         
         # Battery control entity IDs from config
-        self.battery_mode_select = config.get("battery_mode_select")
-        self.battery_charge_power = config.get("battery_charge_power")
-        self.battery_discharge_power = config.get("battery_discharge_power")
+        detected_entities = config.get(CONF_DETECTED_ENTITIES, {})
+        self.battery_mode_select = detected_entities.get("battery_mode_select")
+        self.battery_charge_power = detected_entities.get("battery_charge_power")
+        self.battery_discharge_power = detected_entities.get("battery_discharge_power")
+        
+        # Mode mappings from config (device-specific mode names)
+        self.mode_self_use = detected_entities.get(CONF_MODE_SELF_USE, "Self Use")
+        self.mode_backup = detected_entities.get(CONF_MODE_BACKUP, "Backup")
+        self.mode_force_charge = detected_entities.get(CONF_MODE_FORCE_CHARGE, "Force Charge")
         
         # State
         self._enabled = False
@@ -264,7 +276,7 @@ class BatteryControlExecutor:
                     "select_option",
                     {
                         "entity_id": self.battery_mode_select,
-                        "option": "Force Charge",
+                        "option": self.mode_force_charge,
                     },
                     blocking=True,
                 )
@@ -284,7 +296,7 @@ class BatteryControlExecutor:
                         blocking=True,
                     )
                 
-                _LOGGER.info(f"Applied Force Charge mode with {power_kw}kW")
+                _LOGGER.info(f"Applied Force Charge mode ({self.mode_force_charge}) with {power_kw}kW")
                 
             elif mode == "self_use":
                 # Set to Self Use mode
@@ -293,12 +305,12 @@ class BatteryControlExecutor:
                     "select_option",
                     {
                         "entity_id": self.battery_mode_select,
-                        "option": "Self Use",
+                        "option": self.mode_self_use,
                     },
                     blocking=True,
                 )
                 
-                _LOGGER.info("Applied Self Use mode")
+                _LOGGER.info(f"Applied Self Use mode ({self.mode_self_use})")
                 
             elif mode == "backup":
                 # Set to Backup mode (preserves battery)
@@ -307,12 +319,12 @@ class BatteryControlExecutor:
                     "select_option",
                     {
                         "entity_id": self.battery_mode_select,
-                        "option": "Backup",
+                        "option": self.mode_backup,
                     },
                     blocking=True,
                 )
                 
-                _LOGGER.info("Applied Backup mode")
+                _LOGGER.info(f"Applied Backup mode ({self.mode_backup})")
             
             else:
                 _LOGGER.error(f"Unknown control mode: {mode}")
