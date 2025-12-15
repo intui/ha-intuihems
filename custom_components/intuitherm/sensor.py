@@ -746,8 +746,10 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
                 timestamp_str = control.get("target_timestamp")
                 if timestamp_str:
                     control_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    # Convert to local timezone for display
+                    control_time_local = dt_util.as_local(control_time)
                     if control_time >= now:
-                        time_key = control_time.strftime("%H:%M")
+                        time_key = control_time_local.strftime("%H:%M")
                         
                         # Only add if we haven't seen this time yet (avoid duplicates)
                         if time_key not in seen_times:
