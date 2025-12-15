@@ -84,14 +84,6 @@ class BatteryControlExecutor:
         
         # Schedule execution at the next aligned time
         self._schedule_next_execution()
-        
-        # Also execute immediately if we're close to an aligned time
-        now = dt_util.now()
-        time_until_next = (self._next_execution - now).total_seconds()
-        
-        if time_until_next < 60:  # Within 1 minute of aligned time
-            _LOGGER.info("Close to aligned time, executing immediately")
-            self.hass.async_create_task(self._execute_control())
 
     def stop(self) -> None:
         """Stop the battery control executor."""
@@ -182,8 +174,16 @@ class BatteryControlExecutor:
                 return
             
             # Find control for current time window
-            # Match controls within +/- 5 minutes of now
+            # Match control at the current aligned quarter-hour mark
             target_control = None
+            
+            # Calculate current aligned time (round down to last quarter hour)
+            current_minute = now.minute
+            aligned_minute = (current_minute // 15) * 15
+            current_aligned = now.replace(minute=aligned_minute, second=0, microsecond=0)
+            
+            _LOGGER.debug(f"Looking for control at aligned time: {current_aligned}")
+            
             for control in controls:
                 control_time_str = control.get("target_timestamp")
                 if not control_time_str:
@@ -197,11 +197,12 @@ class BatteryControlExecutor:
                     _LOGGER.error(f"Failed to parse control timestamp {control_time_str}: {e}")
                     continue
                 
-                # Check if this control is for current time window (within 5 minutes)
-                time_diff = abs((control_time - now).total_seconds())
+                # Match exact quarter-hour (allow up to 30 seconds before/after for timing jitter)
+                time_diff = abs((control_time - current_aligned).total_seconds())
                 
-                if time_diff < 300:  # 5 minutes tolerance
+                if time_diff < 30:  # 30 seconds tolerance for exact match
                     target_control = control
+                    _LOGGER.debug(f"Found matching control for {current_aligned}: {control.get('control_action')}")
                     break
             
             if not target_control:

@@ -645,7 +645,7 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
 
     @property
     def native_value(self) -> str | None:
-        """Return next control decision as text."""
+        """Return next 4 upcoming control decisions as text."""
         if not self.coordinator.data:
             return None
 
@@ -657,46 +657,52 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
         if not controls:
             return "No upcoming control"
 
-        # Find the next control (first one with timestamp >= now)
+        # Find the next 4 controls (with timestamp >= now)
         from homeassistant.util import dt as dt_util
         now = dt_util.now()
         
-        next_control = None
+        upcoming_controls = []
         for control in controls:
             try:
                 timestamp_str = control.get("target_timestamp")
                 if timestamp_str:
                     control_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
                     if control_time >= now:
-                        next_control = control
-                        break
+                        upcoming_controls.append(control)
+                        if len(upcoming_controls) >= 4:
+                            break
             except:
                 continue
         
-        if not next_control:
+        if not upcoming_controls:
             return "No upcoming control"
 
-        mode = next_control.get("control_action", "unknown")
-        power = next_control.get("power_setpoint", 0)
-        timestamp = next_control.get("target_timestamp")
-
-        # Format mode name
+        # Format mode names
         mode_names = {
             "force_charge": "Charge",
             "self_use": "Self Use",
             "backup": "Preserve"
         }
-        mode_str = mode_names.get(mode, mode)
-
-        if timestamp:
-            try:
-                ts = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                time_str = ts.strftime("%H:%M")
-                return f"{mode_str} @ {time_str}"
-            except:
-                pass
-
-        return f"{mode_str} ({power:.1f}kW)"
+        
+        # Build summary of next 4 controls
+        control_summary = []
+        for control in upcoming_controls:
+            mode = control.get("control_action", "unknown")
+            mode_str = mode_names.get(mode, mode)
+            timestamp = control.get("target_timestamp")
+            
+            if timestamp:
+                try:
+                    ts = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    time_str = ts.strftime("%H:%M")
+                    control_summary.append(f"{time_str} {mode_str}")
+                except:
+                    control_summary.append(mode_str)
+            else:
+                control_summary.append(mode_str)
+        
+        # Join with arrows for readability
+        return " → ".join(control_summary)
 
     @property
     def icon(self) -> str:
@@ -736,7 +742,7 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return control plan details."""
+        """Return control plan details with upcoming controls."""
         if not self.coordinator.data:
             return {}
 
@@ -746,8 +752,30 @@ class IntuiThermNextControlSensor(IntuiThermSensorBase):
 
         controls = control_data.get("controls", [])
         
+        # Get next 4 upcoming controls for detailed attributes
+        from homeassistant.util import dt as dt_util
+        now = dt_util.now()
+        
+        upcoming = []
+        for control in controls:
+            try:
+                timestamp_str = control.get("target_timestamp")
+                if timestamp_str:
+                    control_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                    if control_time >= now:
+                        upcoming.append({
+                            "time": control_time.strftime("%H:%M"),
+                            "action": control.get("control_action"),
+                            "power_kw": control.get("power_setpoint", 0),
+                            "expected_soc": round(control.get("expected_soc", 0) * 100)
+                        })
+                        if len(upcoming) >= 4:
+                            break
+            except:
+                continue
+        
         attrs = {
-            "controls": controls[:10],  # Limit to next 10 controls to avoid huge attribute
+            "upcoming_controls": upcoming,
             "total_controls": len(controls),
             "plan_generated_at": control_data.get("plan_generated_at"),
         }
