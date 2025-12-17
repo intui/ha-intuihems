@@ -34,7 +34,7 @@ So wird dein Speicher genau dann geladen oder genutzt, wenn es wirtschaftlich un
 
 intuiHEMS befindet sich aktuell in der Alpha-Phase. Die Kernfunktionen sind stabil, dennoch können vereinzelt Bugs auftreten.
 
-Während der Alpha-Phase ist das Plugin kostenlos und auf **100 Tester limitiert**. Ziel ist es, durch kontinuierliche Weiterentwicklung Stromkosten um **20–40 %** zu senken. Feedback aus der Community spielt dabei eine zentrale Rolle.
+Während der Alpha-Phase ist das Plugin kostenlos und auf **100 Tester limitiert**. Feedback aus der Community spielt dabei eine zentrale Rolle. Wenn Ihr dabei sein wollt, schreibt eine kurze Nachricht an [Wido](https://github.com/intui) oder öffnet ein Issue mit der Beschreibung eures Systems: welche Batterie, Wechselrichter, dyn. Stromtarif.
 
 ## 📋 Voraussetzungen
 
@@ -61,6 +61,7 @@ Dein Batteriespeicher wird jetzt automatisch optimiert.
 **Hinweis:** Systeme die nicht automatisch erkannt werden, können manuell angebunden werden.
 
 **Mit ❤️ für die Home Assistant Community**
+
 
 # intuiHEMS - Smart Battery Optimizer
 
