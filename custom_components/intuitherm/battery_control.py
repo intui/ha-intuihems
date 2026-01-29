@@ -291,8 +291,9 @@ class BatteryControlExecutor:
                     _LOGGER.info(f"Using Huawei forcible charge procedure for {power_kw}kW")
                     
                     # Step 1: Start forcible charge with power and duration
-                    power_watts = int(power_kw * 1000)  # Convert kW to Watts
-                    power_watts = max(1000, min(50000, power_watts))  # Clamp to 1-50kW
+                    # Use MPC-calculated power (power_kw is the optimal value between 0 and configured max)
+                    # The max power configured during setup is stored but MPC calculates optimal value per period
+                    power_watts = int(round(abs(power_kw), 2) * 1000)  # Convert kW to Watts from MPC, limit to 2 decimals
                     
                     ha_device_id = detected_entities.get("ha_device_id")
                     if not ha_device_id:
@@ -302,7 +303,7 @@ class BatteryControlExecutor:
                     service_data = {
                         "device_id": ha_device_id,  # HA device registry ID
                         "duration": 16,  # 16 minutes (slightly longer than 15min control interval)
-                        "power": power_watts,
+                        "power": str(power_watts),  # Huawei requires power as string, MPC respects configured limits
                     }
                     
                     try:

@@ -93,11 +93,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Initialize battery control executor if battery entities are configured
     battery_executor = None
     detected_entities = config.get(CONF_DETECTED_ENTITIES, {})
-    if all([
-        detected_entities.get(CONF_BATTERY_MODE_SELECT),
-        detected_entities.get(CONF_BATTERY_CHARGE_POWER),
-    ]):
-        _LOGGER.info("Battery control entities configured, initializing executor")
+    
+    # Check if we have minimum required entities
+    # For Huawei: battery_mode_select is required, battery_charge_power is optional (uses forcible_charge service)
+    # For other brands: both battery_mode_select and battery_charge_power are required
+    is_huawei = detected_entities.get("grid_charge_switch") is not None
+    has_mode_select = detected_entities.get(CONF_BATTERY_MODE_SELECT) is not None
+    has_charge_power = detected_entities.get(CONF_BATTERY_CHARGE_POWER) is not None
+    
+    can_start_executor = has_mode_select and (is_huawei or has_charge_power)
+    
+    if can_start_executor:
+        _LOGGER.info(
+            f"Battery control entities configured, initializing executor "
+            f"(is_huawei={is_huawei}, has_charge_power={has_charge_power})"
+        )
         battery_executor = BatteryControlExecutor(
             hass=hass,
             coordinator=coordinator,
@@ -109,7 +119,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         battery_executor.start()
         _LOGGER.info("Battery control executor started")
     else:
-        _LOGGER.info("Battery control entities not configured, executor disabled")
+        missing = []
+        if not has_mode_select:
+            missing.append("battery_mode_select")
+        if not is_huawei and not has_charge_power:
+            missing.append("battery_charge_power (required for non-Huawei)")
+        _LOGGER.info(
+            f"Battery control executor disabled - missing entities: {', '.join(missing)}"
+        )
 
     # Forward entry setup to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

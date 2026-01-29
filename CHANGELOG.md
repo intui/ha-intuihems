@@ -5,6 +5,33 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.01.29.2] - 2026-01-29
+
+### Fixed
+- **CRITICAL: Battery Control Executor Not Starting for Huawei Systems**
+  - Root cause: Executor required `battery_charge_power` entity which Huawei systems don't have
+  - Huawei uses `forcible_charge` service instead of a charge power entity
+  - Made `battery_charge_power` optional for Huawei (detected via `grid_charge_switch` presence)
+  - Executor now starts for Huawei systems with only `battery_mode_select`
+  - **This was why battery didn't charge - the executor never started!**
+- **Huawei Battery Charge Power: Use MPC-Calculated Optimal Power**
+  - Now uses MPC-calculated `control.power_kw` (optimal power per 15-min period)
+  - Previously read from `battery_charge_power` entity (configured max power)
+  - MPC dynamically optimizes power between 0 and configured max for each period
+  - Power converted to watts and passed as string to `forcible_charge` service
+  - Example: MPC calculates 2.0kW → service receives "2000" watts
+- **Improved Huawei Logging**: Changed critical logs from DEBUG to INFO level
+  - Added try/except with exc_info for service call failures
+  - Added ✓/✗ indicators for success/failure visibility
+  - Log device_id being used in forcible_charge call
+
+### Technical Details
+- `__init__.py` line 95: Changed startup check from `all([mode_select, charge_power])` to smart detection
+- Now checks: `has_mode_select AND (is_huawei OR has_charge_power)`
+- Huawei detection: Presence of `grid_charge_switch` entity
+- Battery charge power: Uses `abs(power_kw) * 1000` from MPC control, clamped to 1-50kW
+- Service call: `{"device_id": str, "duration": 16, "power": str(watts)}`
+
 ## [2026.01.29.1] - 2026-01-29
 
 ### Fixed
