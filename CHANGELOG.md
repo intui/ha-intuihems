@@ -5,6 +5,16 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.01.29.3] - 2026-01-29
+
+### Fixed
+- **CRITICAL: Fix KeyError 'device_id' in Huawei backup and self_use modes**
+  - In v2026.01.28.2, renamed `device_id` key to `ha_device_id` for Huawei battery device
+  - Updated force_charge mode but forgot to update backup and self_use modes
+  - Both modes were still looking for old `device_id` key causing KeyError crash
+  - Now all three modes (force_charge, self_use, backup) use `ha_device_id` consistently
+  - Error appeared as: "Error applying control backup: 'device_id'" at line 479/483
+
 ## [2026.01.29.2] - 2026-01-29
 
 ### Fixed

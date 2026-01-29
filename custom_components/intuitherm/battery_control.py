@@ -419,10 +419,10 @@ class BatteryControlExecutor:
                     await asyncio.sleep(5)
                     
                     # Step 3: Stop forcible charge
-                    device_id = detected_entities.get("device_id")
+                    ha_device_id = detected_entities.get("ha_device_id")
                     service_data = {}
-                    if device_id:
-                        service_data["device_id"] = device_id
+                    if ha_device_id:
+                        service_data["device_id"] = ha_device_id
                     
                     await self.hass.services.async_call(
                         "huawei_solar",
@@ -479,10 +479,10 @@ class BatteryControlExecutor:
                     
                     await asyncio.sleep(5)
                     
-                    device_id = detected_entities.get("device_id")
+                    ha_device_id = detected_entities.get("ha_device_id")
                     service_data = {}
-                    if device_id:
-                        service_data["device_id"] = device_id
+                    if ha_device_id:
+                        service_data["device_id"] = ha_device_id
                     
                     await self.hass.services.async_call(
                         "huawei_solar",
