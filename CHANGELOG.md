@@ -5,6 +5,20 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.01.29.1] - 2026-01-29
+
+### Fixed
+- **Huawei Battery Control Logging**: Changed forcible_charge service call logging from DEBUG to INFO level
+  - Added explicit success/failure logging with ✓/✗ indicators
+  - Added error handling with exc_info for better debugging
+  - Log now shows device_id being used for forcible_charge service
+  - This helps diagnose battery control issues when HA logs cannot be accessed
+
+### Technical Details
+- The Huawei forcible_charge service call was using `_LOGGER.debug()` which prevented visibility into execution
+- Now uses `_LOGGER.info()` with try/except blocks to catch and log service call failures
+- Critical for diagnosing why battery didn't charge overnight despite MPC generating force_charge controls
+
 ## [2026.01.28.2] - 2026-01-28
 
 ### Fixed

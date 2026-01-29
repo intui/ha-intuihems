@@ -305,28 +305,35 @@ class BatteryControlExecutor:
                         "power": power_watts,
                     }
                     
-                    await self.hass.services.async_call(
-                        "huawei_solar",
-                        "forcible_charge",
-                        service_data,
-                        blocking=True,
-                    )
+                    try:
+                        await self.hass.services.async_call(
+                            "huawei_solar",
+                            "forcible_charge",
+                            service_data,
+                            blocking=True,
+                        )
+                        _LOGGER.info(f"✓ Called huawei_solar.forcible_charge with {power_watts}W for 16 minutes (device_id={ha_device_id})")
+                    except Exception as e:
+                        _LOGGER.error(f"✗ Failed to call huawei_solar.forcible_charge: {e}", exc_info=True)
+                        return False
                     
-                    _LOGGER.debug(f"Called huawei_solar.forcible_charge with {power_watts}W for 16 minutes")
                     await asyncio.sleep(5)
                     
                     # Step 2: Set battery mode to fixed_charge_discharge
-                    await self.hass.services.async_call(
-                        "select",
-                        "select_option",
-                        {
-                            "entity_id": self.battery_mode_select,
-                            "option": "fixed_charge_discharge",
-                        },
-                        blocking=True,
-                    )
-                    
-                    _LOGGER.debug("Set battery mode to fixed_charge_discharge")
+                    try:
+                        await self.hass.services.async_call(
+                            "select",
+                            "select_option",
+                            {
+                                "entity_id": self.battery_mode_select,
+                                "option": "fixed_charge_discharge",
+                            },
+                            blocking=True,
+                        )
+                        _LOGGER.info(f"✓ Set battery mode to fixed_charge_discharge")
+                    except Exception as e:
+                        _LOGGER.error(f"✗ Failed to set battery mode: {e}", exc_info=True)
+                        return False
                     await asyncio.sleep(5)
                     
                     # Step 3: Enable grid charging switch
