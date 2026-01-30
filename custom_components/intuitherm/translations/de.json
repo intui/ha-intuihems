@@ -72,7 +72,7 @@
     "step": {
       "init": {
         "title": "IntuiTherm Optionen konfigurieren",
-        "description": "Aktualisieren Sie Ihre IntuiTherm-Integrationseinstellungen.",
+        "description": "Aktualisieren Sie Ihre IntuiTherm-Integrationseinstellungen.\n\n**Ihre Benutzer-ID:** `{user_id}`\n\nℹ️ Speichern Sie diese ID für Fehlerbehebung und Support.",
         "data": {
           "service_url": "Dienst-URL",
           "api_key": "API-Schlüssel",

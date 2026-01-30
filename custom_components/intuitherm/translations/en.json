@@ -110,7 +110,7 @@
     "step": {
       "init": {
         "title": "Configure IntuiTherm Options",
-        "description": "Update your IntuiTherm integration settings.",
+        "description": "Update your IntuiTherm integration settings.\n\n**Your User ID:** `{user_id}`\n\nℹ️ Save this ID for troubleshooting and support.",
         "data": {
           "service_url": "Service URL",
           "api_key": "API Key",

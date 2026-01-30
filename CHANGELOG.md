@@ -5,6 +5,15 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.01.30.1] - 2026-01-30
+
+### Added
+- **Display User ID in Options Screen**
+  - Shows user ID prominently in the configuration options dialog
+  - Helps users identify their ID for troubleshooting and support
+  - Added to both English and German translations
+  - Format: "Your User ID: `{user_id}`" with info icon for saving
+
 ## [2026.01.29.4] - 2026-01-29
 
 ### Added
