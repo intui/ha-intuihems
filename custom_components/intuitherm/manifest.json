@@ -4,10 +4,10 @@
   "codeowners": ["@intui"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/intui/intuiHEMS",
+  "documentation": "https://github.com/intui/ha-intuihems",
   "integration_type": "service",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/intui/intuiHEMS/issues",
+  "issue_tracker": "https://github.com/intui/ha-intuihems/issues",
   "requirements": ["aiohttp>=3.9.0"],
   "version": "2026.01.30.1"
 }
