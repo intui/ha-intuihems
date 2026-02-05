@@ -381,7 +381,7 @@ class BatteryControlExecutor:
                         "select", "select_option",
                         {
                             "entity_id": self.solaredge_command_mode,
-                            "option": "Charge from Solar Power and Grid",
+                            "option": SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID,
                         },
                         blocking=True,
                     )
