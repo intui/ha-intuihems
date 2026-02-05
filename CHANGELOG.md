@@ -5,6 +5,22 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.02.05.1] - 2026-02-05
+
+### Changed
+- **Config Flow & Options UI Improvements**
+  - Fixed sensor labels: Changed "Solar Power (kW)" to "Solar Energy Total (kWh)" - these are cumulative energy sensors, not instantaneous power
+  - Fixed sensor labels: Changed "House Load (kW)" to "House Energy Consumption (kWh)" - same reason
+  - Removed unused "Grid Export Price" field from pricing configuration (not currently used, was confusing)
+  - Added comprehensive field descriptions explaining the purpose of each configuration option
+  - Updated all translation files (EN, DE) and strings.json with consistent terminology
+
+### Technical Details
+- The integration uses cumulative energy sensors (kWh, total_increasing) for solar and house load
+- Backend automatically calculates instantaneous power from energy readings
+- Battery Max Power (kW) label remains correct as it represents charge/discharge rate
+- Grid export price constant kept in const.py for future use but removed from UI
+
 ## [2026.01.30.1] - 2026-01-30
 
 ### Added

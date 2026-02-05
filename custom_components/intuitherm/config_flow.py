@@ -980,7 +980,6 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Validate pricing inputs
             epex_markup = user_input.get(CONF_EPEX_MARKUP, DEFAULT_EPEX_MARKUP)
-            grid_export_price = user_input.get(CONF_GRID_EXPORT_PRICE, DEFAULT_GRID_EXPORT_PRICE)
             dry_run_mode = user_input.get(CONF_DRY_RUN_MODE, False)
             battery_capacity = user_input.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY)
             battery_max_power = user_input.get(CONF_BATTERY_MAX_POWER, DEFAULT_BATTERY_MAX_POWER)
@@ -991,13 +990,6 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     errors[CONF_EPEX_MARKUP] = "Markup must be between 0 and 1 €/kWh"
             except (ValueError, TypeError):
                 errors[CONF_EPEX_MARKUP] = "Invalid number format"
-            
-            try:
-                grid_export_price = float(grid_export_price)
-                if grid_export_price < 0 or grid_export_price > 1:
-                    errors[CONF_GRID_EXPORT_PRICE] = "Export price must be between 0 and 1 €/kWh"
-            except (ValueError, TypeError):
-                errors[CONF_GRID_EXPORT_PRICE] = "Invalid number format"
             
             try:
                 battery_capacity = float(battery_capacity)
@@ -1016,14 +1008,13 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 # Store pricing, battery specs, and control mode configuration
                 self._detected_entities[CONF_EPEX_MARKUP] = epex_markup
-                self._detected_entities[CONF_GRID_EXPORT_PRICE] = grid_export_price
                 self._detected_entities[CONF_DRY_RUN_MODE] = dry_run_mode
                 self._detected_entities[CONF_BATTERY_CAPACITY] = battery_capacity
                 self._detected_entities[CONF_BATTERY_MAX_POWER] = battery_max_power
                 
                 _LOGGER.info(
-                    "Pricing configured: markup=%.3f€/kWh, export=%.3f€/kWh, dry_run=%s",
-                    epex_markup, grid_export_price, dry_run_mode
+                    "Pricing configured: markup=%.3f€/kWh, dry_run=%s",
+                    epex_markup, dry_run_mode
                 )
                 _LOGGER.info(
                     "Battery configured: capacity=%.1fkWh, max_power=%.2fkW",
@@ -1047,11 +1038,10 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="pricing",
             data_schema=vol.Schema({
-                vol.Required(CONF_BATTERY_CAPACITY, default=DEFAULT_BATTERY_CAPACITY, description="Battery usable capacity in kWh (e.g., 10.0)"): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
-                vol.Required(CONF_BATTERY_MAX_POWER, default=DEFAULT_BATTERY_MAX_POWER, description="Battery max charge/discharge power in kW (e.g., 5.0)"): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0)),
-                vol.Required(CONF_EPEX_MARKUP, default=DEFAULT_EPEX_MARKUP, description="Markup added to EPEX spot price in €/kWh (e.g., 0.10)"): vol.Coerce(float),
-                vol.Required(CONF_GRID_EXPORT_PRICE, default=DEFAULT_GRID_EXPORT_PRICE, description="Price for exporting to grid in €/kWh (e.g., 0.08)"): vol.Coerce(float),
-                vol.Optional(CONF_DRY_RUN_MODE, default=False, description="Dry run mode (recommendations only, no battery control)"): bool,
+                vol.Required(CONF_BATTERY_CAPACITY, default=DEFAULT_BATTERY_CAPACITY, description="Total usable battery capacity in kWh. This is the energy your battery can store and use. Example: 10 for a 10 kWh battery."): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
+                vol.Required(CONF_BATTERY_MAX_POWER, default=DEFAULT_BATTERY_MAX_POWER, description="Maximum charging/discharging rate in kW. Limits how fast the battery can charge or discharge. Example: 3 for a 3 kW inverter."): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0)),
+                vol.Required(CONF_EPEX_MARKUP, default=DEFAULT_EPEX_MARKUP, description="Additional cost on top of EPEX spot price in €/kWh (taxes, fees, supplier margin). Example: 0.15 if you pay 15 cents above spot price."): vol.Coerce(float),
+                vol.Optional(CONF_DRY_RUN_MODE, default=False, description="Enable to see optimization recommendations without controlling your battery. Perfect for testing the system safely."): bool,
             }),
             errors=errors,
             description_placeholders={
@@ -2306,12 +2296,12 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             vol.Required(
                 CONF_BATTERY_CAPACITY,
                 default=current_config.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
-                description="Total usable battery capacity in kilowatt-hours (kWh). Example: 10.0 for a 10 kWh battery."
+                description="Total usable battery capacity in kilowatt-hours (kWh). This is the amount of energy your battery can store and use. Example: 10 for a 10 kWh battery."
             ): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
             vol.Required(
                 CONF_BATTERY_MAX_POWER,
                 default=current_config.get(CONF_BATTERY_MAX_POWER, DEFAULT_BATTERY_MAX_POWER),
-                description="Maximum charge power in kilowatts (kW). Example: 3.0 for a 3 kW inverter."
+                description="Maximum charging/discharging rate in kilowatts (kW). Limits how fast the battery can charge or discharge. Example: 3 for a 3 kW inverter."
             ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=20.0)),
         }
         
@@ -2369,14 +2359,14 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 schema[vol.Optional(
                     CONF_BATTERY_SOC_ENTITY,
                     default=current_soc,
-                    description="Battery State of Charge sensor showing current battery level (0-100%)."
+                    description="Sensor showing battery charge percentage (0-100%). Tracks how full your battery currently is. Used to optimize charging decisions."
                 )] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(soc_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
             else:
                 schema[vol.Optional(
                     CONF_BATTERY_SOC_ENTITY,
-                    description="Battery State of Charge sensor showing current battery level (0-100%)."
+                    description="Sensor showing battery charge percentage (0-100%). Tracks how full your battery currently is. Used to optimize charging decisions."
                 )] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(soc_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
@@ -2385,7 +2375,7 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             schema[vol.Optional(
                 CONF_BATTERY_SOC_ENTITY,
                 default=current_soc or "",
-                description="Battery State of Charge sensor showing current battery level (0-100%)."
+                description="Sensor showing battery charge percentage (0-100%). Tracks how full your battery currently is. Used to optimize charging decisions."
             )] = str
 
         # Power/Energy sensors
@@ -2398,14 +2388,14 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 schema[vol.Optional(
                     CONF_SOLAR_POWER_ENTITY,
                     default=current_solar,
-                    description="Solar production sensor showing current solar total energy (kWh)."
+                    description="Cumulative solar energy production sensor (kWh, total_increasing). Tracks total energy generated by your solar panels. The system calculates power from these readings."
                 )] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(power_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
             else:
                 schema[vol.Optional(
                     CONF_SOLAR_POWER_ENTITY,
-                    description="Solar production sensor showing current solar total energy (kWh)."
+                    description="Cumulative solar energy production sensor (kWh, total_increasing). Tracks total energy generated by your solar panels. The system calculates power from these readings."
                 )] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(power_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
@@ -2418,14 +2408,14 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 schema[vol.Optional(
                     CONF_HOUSE_LOAD_ENTITY,
                     default=current_load,
-                    description="Total house energy consumption sensor (kWh)."
+                    description="Cumulative house energy consumption sensor (kWh, total_increasing). Tracks total energy used by your home. Used to predict consumption patterns."
                 )] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(power_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
             else:
                 schema[vol.Optional(
                     CONF_HOUSE_LOAD_ENTITY,
-                    description="Total house energy consumption sensor (kWh)."
+                    description="Cumulative house energy consumption sensor (kWh, total_increasing). Tracks total energy used by your home. Used to predict consumption patterns."
                 )] = selector.SelectSelector(
                     selector.SelectSelectorConfig(options=list(power_entities.keys()), custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN)
                 )
@@ -2437,12 +2427,12 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             schema[vol.Optional(
                 CONF_SOLAR_POWER_ENTITY,
                 default=current_solar or "",
-                description="Solar production sensor showing current solar total energy (kWh)."
+                description="Cumulative solar energy production sensor (kWh, total_increasing). Tracks total energy generated by your solar panels."
             )] = str
             schema[vol.Optional(
                 CONF_HOUSE_LOAD_ENTITY,
                 default=current_load or "",
-                description="Total house energy consumption sensor (kWh)."
+                description="Cumulative house energy consumption sensor (kWh, total_increasing). Tracks total energy used by your home."
             )] = str
 
         # Use detected or current values for battery control entities
@@ -2453,7 +2443,7 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
         schema[vol.Optional(
             CONF_BATTERY_MODE_SELECT,
             default=current_mode_select,
-            description="Select entity for battery mode control (e.g., select.work_mode). Leave empty for monitoring-only mode without battery control."
+            description="Select entity that controls battery operating mode (e.g., select.work_mode). Enables automatic switching between Self Use, Backup, and Force Charge modes. Leave empty for monitoring-only."
         )] = selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=all_select_entities if all_select_entities else [],
@@ -2465,7 +2455,7 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
         schema[vol.Optional(
             CONF_BATTERY_CHARGE_POWER,
             default=current_charge_power,
-            description="Number entity to control battery charging power (e.g., number.max_charge_current). Leave empty for monitoring-only mode."
+            description="Number entity to control battery charging power (e.g., number.force_charge_power). Controls how fast the battery charges during force charge periods. Leave empty if not available."
         )] = selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=all_number_entities if all_number_entities else [],

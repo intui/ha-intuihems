@@ -41,19 +41,17 @@
       },
       "pricing": {
         "title": "Batterie & Preise konfigurieren",
-        "description": "Konfigurieren Sie Ihre Batteriespezifikationen und Strompreise.\n\n🔋 Batteriekonfiguration\n   • Geben Sie Ihre tatsächliche Batteriekapazität und maximale Leistung ein\n   • Wird für Optimierungsberechnungen verwendet\n\n💶 Dynamische Preise\n   • EPEX-Aufschlag: Zusätzliche Kosten zum Spotpreis\n   • Einspeisevergütung: Vergütung für verkaufte Energie\n\n✨ Historische Daten werden beim ersten Lauf automatisch gesammelt",
+        "description": "Konfigurieren Sie Ihre Batteriespezifikationen und Strompreise.\n\n🔋 Batteriekonfiguration\n   • Geben Sie Ihre tatsächliche Batteriekapazität und maximale Leistung ein\n   • Wird für Optimierungsberechnungen verwendet\n\n💶 Dynamische Preise\n   • EPEX-Aufschlag: Zusätzliche Kosten zum Spotpreis\n\n✨ Historische Daten werden beim ersten Lauf automatisch gesammelt",
         "data": {
           "battery_capacity": "Batteriekapazität (kWh)",
           "battery_max_power": "Maximale Batterieleistung (kW)",
           "epex_markup": "Netzbezugsaufschlag (€/kWh)",
-          "grid_export_price": "Einspeisevergütung (€/kWh)",
           "dry_run_mode": "Testmodus (ohne Batteriesteuerung)"
         },
         "data_description": {
           "battery_capacity": "Gesamte nutzbare Batteriekapazität in kWh (z.B. 11.0 für eine 11 kWh Batterie)",
           "battery_max_power": "Maximale Lade-/Entladeleistung in kW (z.B. 2.99 für ~3 kW max)",
           "epex_markup": "Zusätzliche Kosten, die Sie zusätzlich zum EPEX-Spotpreis zahlen (Steuern, Gebühren, Lieferantenmarge)",
-          "grid_export_price": "Einspeisevergütung, die Sie für exportierte Energie erhalten",
           "dry_run_mode": "Aktivieren, um MPC zu testen, ohne Batteriebefehle zu senden"
         }
       }
@@ -74,20 +72,28 @@
         "title": "IntuiTherm Optionen konfigurieren",
         "description": "Aktualisieren Sie Ihre IntuiTherm-Integrationseinstellungen.\n\n**Ihre Benutzer-ID:** `{user_id}`",
         "data": {
-          "service_url": "Dienst-URL",
-          "api_key": "API-Schlüssel",
-          "update_interval": "Aktualisierungsintervall (Sekunden)",
+          "battery_capacity_kwh": "Batteriekapazität (kWh)",
+          "battery_max_power_kw": "Max. Batterieleistung (kW)",
           "battery_soc_entity": "Batterieladezustand (%)",
-          "solar_power_entity": "Solarleistung (kW)",
-          "house_load_entity": "Hausverbrauch (kW)"
+          "solar_power_entity": "Solar-Gesamtenergie (kWh)",
+          "house_load_entity": "Hausenergieverbrauch (kWh)",
+          "battery_mode_select": "Batteriemodus-Auswahl",
+          "battery_charge_power": "Ladeleistungssteuerung",
+          "mode_self_use": "Eigenverbrauch-Modusname",
+          "mode_backup": "Backup-Modusname",
+          "mode_force_charge": "Zwangsladung-Modusname"
         },
         "data_description": {
-          "service_url": "URL Ihres IntuiHEMS-Dienstes (z.B. http://128.140.44.143:80)",
-          "api_key": "Bearer-Token für API-Authentifizierung",
-          "update_interval": "Wie oft der Dienst auf Updates abgefragt werden soll (30-300 Sekunden)",
-          "battery_soc_entity": "Sensor, der den Batterieladezustand in Prozent anzeigt (0-100%)",
-          "solar_power_entity": "Sensor, der die aktuelle Solarproduktion in kW anzeigt",
-          "house_load_entity": "Sensor, der den aktuellen Hausverbrauch in kW anzeigt"
+          "battery_capacity_kwh": "Gesamte nutzbare Batteriekapazität in Kilowattstunden. Dies ist die Energiemenge, die Ihre Batterie speichern und nutzen kann. Beispiel: 10 für ein 10 kWh Batteriesystem eingeben.",
+          "battery_max_power_kw": "Maximale Lade-/Entladeleistung in Kilowatt. Begrenzt, wie schnell die Batterie laden oder entladen kann. Beispiel: 3 für einen 3 kW Wechselrichter eingeben.",
+          "battery_soc_entity": "Sensor, der den Batterieladezustand in Prozent anzeigt (0-100%). Zeigt an, wie voll Ihre Batterie aktuell ist. Wird zur Optimierung der Ladeentscheidungen verwendet.",
+          "solar_power_entity": "Kumulativer Solarenergie-Produktionssensor (kWh, total_increasing). Erfasst die gesamte von Ihren Solarmodulen erzeugte Energie. Das System berechnet die momentane Leistung aus diesen Messwerten.",
+          "house_load_entity": "Kumulativer Hausenergieverbrauchssensor (kWh, total_increasing). Erfasst den gesamten Energieverbrauch Ihres Hauses. Wird verwendet, um Verbrauchsmuster vorherzusagen und die Batterienutzung zu optimieren.",
+          "battery_mode_select": "Select-Entität zur Steuerung des Batteriebetriebsmodus (z.B. select.work_mode). Ermöglicht automatisches Umschalten zwischen Eigenverbrauch, Backup und Zwangsladung basierend auf der Optimierung. Leer lassen für Nur-Überwachungsmodus.",
+          "battery_charge_power": "Number-Entität zum Einstellen der maximalen Ladeleistung (z.B. number.force_charge_power). Steuert, wie schnell die Batterie während der Zwangsladeperioden lädt. Leer lassen, wenn nicht verfügbar.",
+          "mode_self_use": "Optionsname Ihres Wechselrichters für den Eigenverbrauch-Modus. In diesem Modus lädt Solar die Batterie und die Batterie versorgt Ihr Haus, ohne Netzladung. Typische Namen: 'Self Use', 'Eigenverbrauch'.",
+          "mode_backup": "Optionsname Ihres Wechselrichters für den Backup/Reserve-Modus. In diesem Modus wird die Batterie für Notfall-Backup aufbewahrt. Typische Namen: 'Backup', 'USV-Modus', 'Reserve'.",
+          "mode_force_charge": "Optionsname Ihres Wechselrichters für den Zwangsladung-Modus. In diesem Modus lädt die Batterie aktiv vom Netz mit der angegebenen Leistung. Typische Namen: 'Force Charge', 'Netzladung'."
         }
       }
     }

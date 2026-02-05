@@ -46,14 +46,12 @@
           \"battery_capacity\": \"Battery Capacity (kWh)\",
           \"battery_max_power\": \"Battery Max Power (kW)\",
           \"epex_markup\": \"Grid Import Markup (€/kWh)\",
-          \"grid_export_price\": \"Grid Export Price (€/kWh)\",
           \"dry_run_mode\": \"Dry Run Mode (No Battery Control)\"
         },
         \"data_description\": {
           \"battery_capacity\": \"Usable capacity of your battery in kWh. For example, if your battery is 13.5 kWh with 90% usable capacity, enter 12.15 kWh. This is used to calculate optimal charge/discharge strategies.\",
           \"battery_max_power\": \"Maximum charging and discharging power in kW. For example, if your battery can charge at 5 kW and discharge at 5 kW, enter 5.0. This limits optimization to realistic power levels.\",
           \"epex_markup\": \"Additional cost you pay on top of EPEX spot price (taxes, distribution fees, supplier margin). For example, if spot price is 0.10 €/kWh and you pay 0.25 €/kWh total, enter 0.15 €/kWh.\",
-          \"grid_export_price\": \"Feed-in tariff you receive for exported solar energy. For example, if you receive 0.08 €/kWh for feeding into the grid, enter 0.08. This helps calculate if it's more profitable to use or export solar energy.\",
           \"dry_run_mode\": \"Enable to see optimization recommendations without controlling your battery. Perfect for testing! When enabled, you'll see what the system would do, but it won't actually change battery modes.\"
         }
       },
@@ -108,10 +106,9 @@
           \"battery_capacity\": \"Battery Capacity (kWh)\",
           \"battery_max_power\": \"Battery Max Power (kW)\",
           \"epex_markup\": \"Grid Import Markup (€/kWh)\",
-          \"grid_export_price\": \"Grid Export Price (€/kWh)\",
           \"battery_soc_entity\": \"Battery State of Charge (%)\",
-          \"solar_power_entity\": \"Solar Production (kWh cumulative)\",
-          \"house_load_entity\": \"House Load (kWh cumulative)\",
+          \"solar_power_entity\": \"Solar Energy Total (kWh)\",
+          \"house_load_entity\": \"House Energy Consumption (kWh)\",
           \"battery_mode_select\": \"Battery Mode Select\",
           \"battery_charge_power\": \"Battery Charge Power Control\",
           \"mode_self_use\": \"Self Use Mode Name\",
@@ -122,7 +119,6 @@
           \"battery_capacity\": \"Usable capacity of your battery in kWh. For example, if your battery is 13.5 kWh with 90% usable capacity, enter 12.15 kWh. This is used to calculate optimal charge/discharge strategies.\",
           \"battery_max_power\": \"Maximum charging and discharging power in kW. For example, if your battery can charge at 5 kW and discharge at 5 kW, enter 5.0. This limits optimization to realistic power levels.\",
           \"epex_markup\": \"Additional cost you pay on top of EPEX spot price (taxes, distribution fees, supplier margin). For example, if spot price is 0.10 €/kWh and you pay 0.25 €/kWh total, enter 0.15 €/kWh.\",
-          \"grid_export_price\": \"Feed-in tariff you receive for exported solar energy. For example, if you receive 0.08 €/kWh for feeding into the grid, enter 0.08. This helps calculate if it's more profitable to use or export solar energy.\",
           \"battery_soc_entity\": \"Sensor showing battery charge percentage (0-100%). This must be a percentage sensor. Example: sensor.battery_soc, sensor.battery_level.\",
           \"solar_power_entity\": \"Cumulative solar energy production sensor (kWh, total_increasing preferred). The integration will automatically calculate power from energy readings. Example: sensor.solar_energy_total.\",
           \"house_load_entity\": \"Cumulative house energy consumption sensor (kWh, total_increasing). Used to track total energy usage. Example: sensor.house_consumption_total.\",
