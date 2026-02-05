@@ -51,6 +51,7 @@ CONF_GRID_EXPORT_SENSORS: Final = "grid_export_sensors"  # List of grid export s
 CONF_BATTERY_MODE_SELECT: Final = "battery_mode_select"  # Battery work mode select entity
 CONF_BATTERY_CHARGE_POWER: Final = "battery_charge_power"  # Battery charge power number entity  
 CONF_BATTERY_DISCHARGE_POWER: Final = "battery_discharge_power"  # Battery discharge power number entity
+CONF_SOLAREDGE_COMMAND_MODE: Final = "solaredge_command_mode"  # SolarEdge command mode select
 
 # Battery control modes (standardized across inverters)
 BATTERY_MODE_SELF_USE: Final = "self_use"
@@ -130,6 +131,10 @@ SENSOR_TYPE_DRY_RUN_MODE: Final = "dry_run_mode"
 SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"
 SWITCH_TYPE_DEMO_MODE: Final = "demo_mode"
 
+# SolarEdge Command Mode
+SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION: Final = "Maximize Self Consumption"
+SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID: Final = "Charge from Solar Power and Grid"
+
 # Device-based control entity mappings
 # Maps (platform, manufacturer, model_pattern) -> control entity patterns
 DEVICE_CONTROL_MAPPINGS: Final = {
@@ -151,6 +156,7 @@ DEVICE_CONTROL_MAPPINGS: Final = {
         "mode_select_patterns": ["storage_control_mode", "battery_mode"],
         "charge_power_patterns": ["storage_charge_limit"],
         "discharge_power_patterns": ["storage_discharge_limit"],
+        "command_mode_patterns": ["storage_command_mode"],
     },
     # Huawei FusionSolar
     ("huawei_solar", "Huawei", None): {

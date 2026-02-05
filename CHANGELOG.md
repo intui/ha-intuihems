@@ -5,6 +5,25 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.02.05.2] - 2026-02-05
+
+### Added
+- **SolarEdge Battery Control Support**
+  - Auto-detects SolarEdge systems via multi-modbus command mode selector
+  - Implements three battery control modes for SolarEdge inverters:
+    - **Force Charge**: Uses "Charge from Solar Power and Grid" mode with configurable charge limit (in Watts)
+    - **Self Use**: Uses "Maximize Self Consumption" mode with peak shaving configuration
+    - **Backup**: Uses backup/reserve mode to preserve battery for emergencies
+  - Automatically configures charge/discharge power limits based on battery specifications
+  - Added `CONF_SOLAREDGE_COMMAND_MODE` constant for SolarEdge command mode selector entity
+
+### Technical Details
+- Detection: Looks for `select.command_mode` or similar entities during config flow
+- Control mappings added to `DEVICE_CONTROL_MAPPINGS` in const.py
+- Command modes: "Maximize Self Consumption" and "Charge from Solar Power and Grid"
+- Power control: Uses number entities for charge/discharge limits (in Watts)
+- Integrates seamlessly with existing MPC optimization system
+
 ## [2026.02.05.1] - 2026-02-05
 
 ### Changed

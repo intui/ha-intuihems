@@ -33,6 +33,7 @@ from .const import (
     CONF_BATTERY_MODE_SELECT,
     CONF_BATTERY_CHARGE_POWER,
     CONF_BATTERY_DISCHARGE_POWER,
+    CONF_SOLAREDGE_COMMAND_MODE,
     CONF_MODE_SELF_USE,
     CONF_MODE_BACKUP,
     CONF_MODE_FORCE_CHARGE,
@@ -1945,6 +1946,18 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         control_entities[CONF_BATTERY_DISCHARGE_POWER] = entry.entity_id
                         _LOGGER.info(
                             "Detected battery discharge power: %s (pattern=%s)",
+                            entry.entity_id,
+                            pattern,
+                        )
+                        break
+            
+            # Look for SolarEdge command mode
+            if entry.domain == "select" and not control_entities.get(CONF_SOLAREDGE_COMMAND_MODE):
+                for pattern in mapping.get("command_mode_patterns", []):
+                    if pattern.lower() in entity_lower:
+                        control_entities[CONF_SOLAREDGE_COMMAND_MODE] = entry.entity_id
+                        _LOGGER.info(
+                            "Detected SolarEdge command mode: %s (pattern=%s)",
                             entry.entity_id,
                             pattern,
                         )
