@@ -131,7 +131,7 @@ SENSOR_TYPE_DRY_RUN_MODE: Final = "dry_run_mode"
 SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"
 SWITCH_TYPE_DEMO_MODE: Final = "demo_mode"
 
-# Solaredge Command Mode
+# SolarEdge Command Mode
 SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION: Final = "Maximize Self Consumption"
 SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID: Final = "Charge from Solar Power and Grid"
 
