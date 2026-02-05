@@ -23,6 +23,8 @@ from .const import (
     CONF_MODE_FORCE_CHARGE,
     CONF_SOLAREDGE_COMMAND_MODE,
     CONF_BATTERY_MAX_POWER,
+    CONF_BATTERY_SOC_ENTITY,
+    CONF_BATTERY_POWER_ENTITY,
     SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
     SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID,
 )
@@ -65,6 +67,10 @@ class BatteryControlExecutor:
         self.battery_charge_power = detected_entities.get("battery_charge_power")
         self.battery_discharge_power = detected_entities.get("battery_discharge_power")
         self.solaredge_command_mode = detected_entities.get(CONF_SOLAREDGE_COMMAND_MODE)
+        
+        # State sensors for feedback
+        self.battery_soc_sensor = detected_entities.get(CONF_BATTERY_SOC_ENTITY, "sensor.battery_soc_2")
+        self.battery_power_sensor = detected_entities.get(CONF_BATTERY_POWER_ENTITY, "sensor.battery_power")
         
         # Max battery power in kW (for SolarEdge backup/peak shaving)
         self.battery_max_power = config.get(CONF_BATTERY_MAX_POWER, 3.0)
@@ -381,7 +387,7 @@ class BatteryControlExecutor:
                         "select", "select_option",
                         {
                             "entity_id": self.solaredge_command_mode,
-                            "option": SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID,
+                            "option": self.mode_force_charge, # Value is mapped to user configured value e.g. "Charge from Solar Power and Grid"
                         },
                         blocking=True,
                     )
@@ -404,7 +410,8 @@ class BatteryControlExecutor:
                     
                     # Set charge power if entity exists
                     if self.battery_charge_power:
-                        power_value = max(0, min(50, power_kw))  # Clamp to 0-50kW
+                        # MPC might send power > configured max, clamp to 0-50kW as safety range
+                        power_value = max(0.0, float(power_kw))
                         
                         await self.hass.services.async_call(
                             "number",
@@ -494,7 +501,7 @@ class BatteryControlExecutor:
                         "select", "select_option",
                         {
                             "entity_id": self.solaredge_command_mode,
-                            "option": SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
+                            "option": self.mode_self_use, # Value is mapped to user configured value e.g. "Maximize Self Consumption"
                         },
                         blocking=True,
                     )
@@ -586,7 +593,7 @@ class BatteryControlExecutor:
                         "select", "select_option",
                         {
                             "entity_id": self.solaredge_command_mode,
-                            "option": SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
+                            "option": self.mode_backup, # Value is mapped to user configured value e.g. "Maximize Self Consumption"
                         },
                         blocking=True,
                     )
@@ -638,7 +645,7 @@ class BatteryControlExecutor:
             actual_power = None
             
             # Try to read battery SOC sensor
-            soc_sensor = self.hass.states.get("sensor.battery_soc_2")
+            soc_sensor = self.hass.states.get(self.battery_soc_sensor)
             if soc_sensor and soc_sensor.state not in ["unknown", "unavailable"]:
                 try:
                     actual_soc = float(soc_sensor.state) / 100.0  # Convert % to 0-1
@@ -646,7 +653,7 @@ class BatteryControlExecutor:
                     pass
             
             # Try to read battery power sensor
-            power_sensor = self.hass.states.get("sensor.battery_power")
+            power_sensor = self.hass.states.get(self.battery_power_sensor)
             if power_sensor and power_sensor.state not in ["unknown", "unavailable"]:
                 try:
                     actual_power = float(power_sensor.state) / 1000.0  # Convert W to kW
