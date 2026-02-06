@@ -117,6 +117,7 @@
           "house_load_entity": "House Energy Consumption (kWh)",
           "battery_mode_select": "Battery Mode Selector",
           "battery_charge_power": "Charge Power Control",
+          "solaredge_command_mode": "SolarEdge Command Mode",
           "mode_self_use": "Self Use Mode Name",
           "mode_backup": "Backup Mode Name",
           "mode_force_charge": "Force Charge Mode Name"
@@ -129,6 +130,7 @@
           "house_load_entity": "Cumulative house energy consumption sensor (kWh, total_increasing). Tracks total energy used by your home. Used to predict consumption patterns and optimize battery usage.",
           "battery_mode_select": "Select entity that controls battery operating mode (e.g., select.work_mode). Enables automatic switching between Self Use, Backup, and Force Charge modes based on optimization. Leave empty for monitoring-only mode.",
           "battery_charge_power": "Number entity to set maximum charging power (e.g., number.force_charge_power). Controls how fast the battery charges during force charge periods. Leave empty if not available.",
+          "solaredge_command_mode": "Select SolarEdge command mode. This controls how the inverter controls the battery. Leave empty to use the default mode.",
           "mode_self_use": "Your inverter's option name for Self Use mode. In this mode, solar charges the battery and the battery powers your home, avoiding grid charging. Common names: 'Self Use', 'Self Consumption'.",
           "mode_backup": "Your inverter's option name for Backup/Reserve mode. In this mode, the battery is preserved for emergency backup power. Common names: 'Backup', 'UPS Mode', 'Reserve'.",
           "mode_force_charge": "Your inverter's option name for Force Charge mode. In this mode, the battery actively charges from the grid at the specified power level. Common names: 'Force Charge', 'Grid Charge'."

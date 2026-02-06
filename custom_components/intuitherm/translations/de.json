@@ -79,6 +79,7 @@
           "house_load_entity": "Hausenergieverbrauch (kWh)",
           "battery_mode_select": "Batteriemodus-Auswahl",
           "battery_charge_power": "Ladeleistungssteuerung",
+          "solaredge_command_mode": "SolarEdge Command Mode",
           "mode_self_use": "Eigenverbrauch-Modusname",
           "mode_backup": "Backup-Modusname",
           "mode_force_charge": "Zwangsladung-Modusname"
@@ -91,6 +92,7 @@
           "house_load_entity": "Kumulativer Hausenergieverbrauchssensor (kWh, total_increasing). Erfasst den gesamten Energieverbrauch Ihres Hauses. Wird verwendet, um Verbrauchsmuster vorherzusagen und die Batterienutzung zu optimieren.",
           "battery_mode_select": "Select-Entität zur Steuerung des Batteriebetriebsmodus (z.B. select.work_mode). Ermöglicht automatisches Umschalten zwischen Eigenverbrauch, Backup und Zwangsladung basierend auf der Optimierung. Leer lassen für Nur-Überwachungsmodus.",
           "battery_charge_power": "Number-Entität zum Einstellen der maximalen Ladeleistung (z.B. number.force_charge_power). Steuert, wie schnell die Batterie während der Zwangsladeperioden lädt. Leer lassen, wenn nicht verfügbar.",
+          "solaredge_command_mode": "SolarEdge-spezifische Select-Entität zur Steuerung der Betriebsmodi (z.B. select.solaredge_mode). Ermöglicht die Verwendung von SolarEdge-spezifischen Befehlen für Eigenverbrauch, Backup und Zwangsladung. Leer lassen, wenn nicht verwendet.",
           "mode_self_use": "Optionsname Ihres Wechselrichters für den Eigenverbrauch-Modus. In diesem Modus lädt Solar die Batterie und die Batterie versorgt Ihr Haus, ohne Netzladung. Typische Namen: 'Self Use', 'Eigenverbrauch'.",
           "mode_backup": "Optionsname Ihres Wechselrichters für den Backup/Reserve-Modus. In diesem Modus wird die Batterie für Notfall-Backup aufbewahrt. Typische Namen: 'Backup', 'USV-Modus', 'Reserve'.",
           "mode_force_charge": "Optionsname Ihres Wechselrichters für den Zwangsladung-Modus. In diesem Modus lädt die Batterie aktiv vom Netz mit der angegebenen Leistung. Typische Namen: 'Force Charge', 'Netzladung'."
