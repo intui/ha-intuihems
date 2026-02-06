@@ -309,7 +309,9 @@ class BatteryControlExecutor:
             
             # Detect if this is a SolarEdge system with multi-modbus entities
             is_solaredge = self.solaredge_command_mode is not None
-            
+
+            _LOGGER.info(f"Detected inverter type: Huawei={is_huawei}, SolarEdge={is_solaredge}")
+
             if mode == "force_charge":
                 if is_huawei:
                     # Huawei-specific procedure using forcible_charge service
