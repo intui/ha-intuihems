@@ -23,6 +23,8 @@ from .const import (
     CONF_MODE_FORCE_CHARGE,
     CONF_SOLAREDGE_COMMAND_MODE,
     CONF_BATTERY_MAX_POWER,
+    CONF_BATTERY_SOC_ENTITY,
+    CONF_BATTERY_POWER_ENTITY,
     SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
     SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID,
 )
@@ -34,6 +36,15 @@ _LOGGER = logging.getLogger(__name__)
 
 # Control interval - execute every 15 minutes aligned to :00, :15, :30, :45
 CONTROL_INTERVAL = timedelta(minutes=15)
+
+
+def kw_to_watts_rounded100(power_kw: float) -> int:
+    """
+    Convert kW to Watts and round to full 100.
+    Negative values are converted to positive as SolarEdge
+    expects positive values for both charge and discharge limits.
+    """
+    return int((abs(power_kw) * 1000 + 50) // 100 * 100) # Round to nearest 100
 
 
 class BatteryControlExecutor:
@@ -65,6 +76,10 @@ class BatteryControlExecutor:
         self.battery_charge_power = detected_entities.get("battery_charge_power")
         self.battery_discharge_power = detected_entities.get("battery_discharge_power")
         self.solaredge_command_mode = detected_entities.get(CONF_SOLAREDGE_COMMAND_MODE)
+        
+        # State sensors for feedback
+        self.battery_soc_sensor = detected_entities.get(CONF_BATTERY_SOC_ENTITY, "sensor.battery_soc_2")
+        self.battery_power_sensor = detected_entities.get(CONF_BATTERY_POWER_ENTITY, "sensor.battery_power")
         
         # Max battery power in kW (for SolarEdge backup/peak shaving)
         self.battery_max_power = config.get(CONF_BATTERY_MAX_POWER, 3.0)
@@ -365,11 +380,12 @@ class BatteryControlExecutor:
                 
                 elif is_solaredge:
                     # SolarEdge Multi Modbus: Force Charge
-                    _LOGGER.info(f"Using SolarEdge multi-modbus force charge for {power_kw}kW")
+                    power_watts = kw_to_watts_rounded100(power_kw)
+
+                    _LOGGER.info(f"Using SolarEdge multi-modbus force charge for {power_kw}kW ({power_watts}Watts)")
                     
                     # 1. Set Charge Limit to target power (in Watts)
                     if self.battery_charge_power:
-                        power_watts = int(round(abs(power_kw), 2) * 1000)
                         await self.hass.services.async_call(
                             "number", "set_value",
                             {"entity_id": self.battery_charge_power, "value": power_watts},
@@ -381,11 +397,11 @@ class BatteryControlExecutor:
                         "select", "select_option",
                         {
                             "entity_id": self.solaredge_command_mode,
-                            "option": SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID,
+                            "option": self.mode_force_charge, # Value is mapped to user configured value e.g. "Charge from Solar Power and Grid"
                         },
                         blocking=True,
                     )
-                    _LOGGER.info(f"Applied SolarEdge Force Charge: {power_kw}kW")
+                    _LOGGER.info(f"Applied SolarEdge Force Charge: {power_kw}kW ({power_watts}Watts), Command Mode: {self.mode_force_charge}")
 
                 else:
                     # Generic procedure for non-Huawei systems (FoxESS, Solis, etc.)
@@ -404,7 +420,8 @@ class BatteryControlExecutor:
                     
                     # Set charge power if entity exists
                     if self.battery_charge_power:
-                        power_value = max(0, min(50, power_kw))  # Clamp to 0-50kW
+                        # MPC might send power > configured max, clamp to 0-50kW as safety range
+                        power_value = max(0.0, float(power_kw))
                         
                         await self.hass.services.async_call(
                             "number",
@@ -469,36 +486,39 @@ class BatteryControlExecutor:
                     _LOGGER.info("Applied Self Use mode (stopped Huawei forcible charge)")
                 
                 elif is_solaredge:
-                    # SolarEdge Multi Modbus: Peak Shaving (Laden blockieren)
-                    _LOGGER.info("Using SolarEdge multi-modbus peak shaving (block charge)")
-                    
+                    # SolarEdge Multi Modbus: Maximize Self Consumption (Charge and Discharge allowed, no limits)
+                    _LOGGER.info("Using SolarEdge multi-modbus Maximize Self Consumption (Charge and Discharge allowed, no limits)")
+
+                    max_power_watts = int(round(abs(self.battery_max_power) * 10) * 100)  # Convert kW to Watts, round to full 100
+
                     # 1. Set Charge Limit to Max Power (in Watts)
                     if self.battery_charge_power:
                         await self.hass.services.async_call(
                             "number", "set_value",
-                            {"entity_id": self.battery_charge_power, "value": int(self.battery_max_power * 1000)},
+                            {"entity_id": self.battery_charge_power, "value": max_power_watts},
                             blocking=True,
                         )
+                        _LOGGER.info(f"SolarEdge - Set Charge Limit to Max Power ({max_power_watts}W)")
                     
                     # 2. Set Discharge Limit to Max Power (in Watts)
                     if self.battery_discharge_power:
-                        max_power_watts = int(self.battery_max_power * 1000)
                         await self.hass.services.async_call(
                             "number", "set_value",
                             {"entity_id": self.battery_discharge_power, "value": max_power_watts},
                             blocking=True,
                         )
+                        _LOGGER.info(f"SolarEdge - Set Discharge Limit to Max Power ({max_power_watts}W)")
                     
                     # 3. Set Command Mode to "Maximize Self Consumption"
                     await self.hass.services.async_call(
                         "select", "select_option",
                         {
                             "entity_id": self.solaredge_command_mode,
-                            "option": SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
+                            "option": self.mode_self_use, # Value is mapped to user configured value e.g. "Maximize Self Consumption"
                         },
                         blocking=True,
                     )
-                    _LOGGER.info("Applied SolarEdge maximize self consumption (Charge and Discharge allowed)")
+                    _LOGGER.info(f"Applied SolarEdge maximize self consumption (Charge and Discharge allowed) Command Mode: {self.mode_self_use} Power: {max_power_watts}W")
 
                 else:
                     # Generic procedure for non-Huawei systems
@@ -563,15 +583,16 @@ class BatteryControlExecutor:
                 elif is_solaredge:
                     # SolarEdge Multi Modbus: Backup (Entladen blockieren)
                     _LOGGER.info("Using SolarEdge multi-modbus backup (block discharge)")
-                    
+                    max_power_watts = int(round(abs(self.battery_max_power) * 10) * 100)  # Convert kW to Watts, round to full 100
+
                     # 1. Set Charge Limit to Max Power (in Watts)
                     if self.battery_charge_power:
-                        max_power_watts = int(self.battery_max_power * 1000)
                         await self.hass.services.async_call(
                             "number", "set_value",
                             {"entity_id": self.battery_charge_power, "value": max_power_watts},
                             blocking=True,
                         )
+                        _LOGGER.info(f"SolarEdge - Set Charge Limit to Max Power ({max_power_watts}W)")
                     
                     # 2. Set Discharge Limit to 0
                     if self.battery_discharge_power:
@@ -580,18 +601,18 @@ class BatteryControlExecutor:
                             {"entity_id": self.battery_discharge_power, "value": 0},
                             blocking=True,
                         )
+                        _LOGGER.info("SolarEdge - Set Discharge Limit to 0")
                     
                     # 3. Set Command Mode to "Maximize Self Consumption"
                     await self.hass.services.async_call(
                         "select", "select_option",
                         {
                             "entity_id": self.solaredge_command_mode,
-                            "option": SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
+                            "option": self.mode_backup, # Value is mapped to user configured value e.g. "Maximize Self Consumption"
                         },
                         blocking=True,
                     )
-                    _LOGGER.info("Applied SolarEdge Backup (Discharge Blocked / Charge Allowed)")
-
+                    _LOGGER.info(f"Applied SolarEdge backup (Discharge Blocked / Charge Allowed) Command Mode: {self.mode_backup} Charge Power: {max_power_watts}W")
                 else:
                     # Generic procedure for non-Huawei systems
                     await self.hass.services.async_call(
@@ -638,7 +659,7 @@ class BatteryControlExecutor:
             actual_power = None
             
             # Try to read battery SOC sensor
-            soc_sensor = self.hass.states.get("sensor.battery_soc_2")
+            soc_sensor = self.hass.states.get(self.battery_soc_sensor)
             if soc_sensor and soc_sensor.state not in ["unknown", "unavailable"]:
                 try:
                     actual_soc = float(soc_sensor.state) / 100.0  # Convert % to 0-1
@@ -646,7 +667,7 @@ class BatteryControlExecutor:
                     pass
             
             # Try to read battery power sensor
-            power_sensor = self.hass.states.get("sensor.battery_power")
+            power_sensor = self.hass.states.get(self.battery_power_sensor)
             if power_sensor and power_sensor.state not in ["unknown", "unavailable"]:
                 try:
                     actual_power = float(power_sensor.state) / 1000.0  # Convert W to kW

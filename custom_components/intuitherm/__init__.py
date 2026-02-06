@@ -19,6 +19,7 @@ from .const import (
     CONF_BATTERY_MODE_SELECT,
     CONF_BATTERY_CHARGE_POWER,
     CONF_BATTERY_DISCHARGE_POWER,
+    CONF_SOLAREDGE_COMMAND_MODE,
     DATA_COORDINATOR,
     DATA_BATTERY_CONTROL,
     DATA_UNSUB,
@@ -137,6 +138,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # For Huawei: battery_mode_select is required, battery_charge_power is optional (uses forcible_charge service)
     # For other brands: both battery_mode_select and battery_charge_power are required
     is_huawei = detected_entities.get("grid_charge_switch") is not None
+    is_solaredge = detected_entities.get(CONF_SOLAREDGE_COMMAND_MODE)
     has_mode_select = detected_entities.get(CONF_BATTERY_MODE_SELECT) is not None
     has_charge_power = detected_entities.get(CONF_BATTERY_CHARGE_POWER) is not None
     
@@ -145,7 +147,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if can_start_executor:
         _LOGGER.info(
             f"Battery control entities configured, initializing executor "
-            f"(is_huawei={is_huawei}, has_charge_power={has_charge_power})"
+            f"(is_huawei={is_huawei}, is_solaredge={is_solaredge}, has_charge_power={has_charge_power})"
         )
         battery_executor = BatteryControlExecutor(
             hass=hass,

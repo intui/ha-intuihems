@@ -38,6 +38,7 @@ CONF_DETECTED_ENTITIES: Final = "detected_entities"
 CONF_BATTERY_SOC_ENTITY: Final = "battery_soc_entity"
 CONF_SOLAR_POWER_ENTITY: Final = "solar_power_entity"
 CONF_HOUSE_LOAD_ENTITY: Final = "house_load_entity"
+CONF_BATTERY_POWER_ENTITY: Final = "battery_power_entity"
 
 # Multi-sensor configuration (lists)
 CONF_SOLAR_SENSORS: Final = "solar_sensors"  # List of solar production sensors

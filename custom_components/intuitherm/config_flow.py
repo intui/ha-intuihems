@@ -23,6 +23,7 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     CONF_DETECTED_ENTITIES,
     CONF_BATTERY_SOC_ENTITY,
+    CONF_BATTERY_POWER_ENTITY,
     CONF_SOLAR_POWER_ENTITY,
     CONF_HOUSE_LOAD_ENTITY,
     CONF_SOLAR_SENSORS,
@@ -842,9 +843,14 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if battery_discharge_power:
                 self._detected_entities[CONF_BATTERY_DISCHARGE_POWER] = battery_discharge_power
             
-            _LOGGER.info("Battery control configured: mode=%s, charge_power=%s, discharge_power=%s",
+            # Extract and store power sensor if provided
+            battery_power_sensor = user_input.get(CONF_BATTERY_POWER_ENTITY)
+            if battery_power_sensor:
+                self._detected_entities[CONF_BATTERY_POWER_ENTITY] = battery_power_sensor
+            
+            _LOGGER.info("Battery control configured: mode=%s, charge_power=%s, discharge_power=%s, power_sensor=%s",
                          battery_mode_select or "none", battery_charge_power or "none", 
-                         battery_discharge_power or "none")
+                         battery_discharge_power or "none", battery_power_sensor or "none")
             
             # If mode select is configured, go to mode mapping step
             if battery_mode_select:
@@ -1265,10 +1271,11 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Get battery SoC entity to find associated device
         battery_soc_entity = self._detected_entities.get(CONF_BATTERY_SOC_ENTITY)
         
-        # Auto-detect battery control entities from device registry
+        # Auto-detect battery control and state entities from device registry
         detected_mode_select = None
         detected_charge_power = None
         detected_discharge_power = None
+        detected_battery_power = None
         
         if battery_soc_entity:
             # Get device ID from battery SoC sensor
@@ -1306,6 +1313,13 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             if any(keyword in entity_id_lower for keyword in ["discharge_power", "discharge_limit", "max_discharge"]):
                                 detected_discharge_power = entity_id
                                 _LOGGER.info("Detected discharge power control: %s", entity_id)
+
+                        # Look for battery power sensor
+                        if entry.domain == "sensor" and not detected_battery_power:
+                            # Search for power sensors on this device that are NOT charge/discharge limits
+                            if "power" in entity_id_lower and any(kw in entity_id_lower for kw in ["battery", "batt"]):
+                                detected_battery_power = entity_id
+                                _LOGGER.info("Detected battery power sensor: %s", entity_id)
         
         # Build selector options for each control type
         from homeassistant.helpers import selector
@@ -1321,6 +1335,12 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         for entry in entity_registry.entities.values():
             if entry.domain == "number" and not entry.disabled_by:
                 all_number_entities.append(entry.entity_id)
+        
+        # Get all sensor entities (for power sensors)
+        all_sensor_entities = []
+        for entry in entity_registry.entities.values():
+            if entry.domain == "sensor" and not entry.disabled_by:
+                all_sensor_entities.append(entry.entity_id)
         
         # Build schema
         schema = {}
@@ -1356,6 +1376,18 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )] = selector.SelectSelector(
             selector.SelectSelectorConfig(
                 options=all_number_entities if all_number_entities else [],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                custom_value=True,
+            )
+        )
+
+        schema[vol.Optional(
+            CONF_BATTERY_POWER_ENTITY,
+            default=detected_battery_power or "sensor.battery_power",
+            description="Battery power sensor entity (W/kW) for feedback."
+        )] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=all_sensor_entities if all_sensor_entities else [],
                 mode=selector.SelectSelectorMode.DROPDOWN,
                 custom_value=True,
             )
@@ -2217,6 +2249,8 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 # Update sensor selections if provided
                 if user_input.get(CONF_BATTERY_SOC_ENTITY):
                     detected_entities[CONF_BATTERY_SOC_ENTITY] = user_input[CONF_BATTERY_SOC_ENTITY]
+                if user_input.get(CONF_BATTERY_POWER_ENTITY):
+                    detected_entities[CONF_BATTERY_POWER_ENTITY] = user_input[CONF_BATTERY_POWER_ENTITY]
                 if user_input.get(CONF_SOLAR_POWER_ENTITY):
                     detected_entities[CONF_SOLAR_POWER_ENTITY] = user_input[CONF_SOLAR_POWER_ENTITY]
                 if user_input.get(CONF_HOUSE_LOAD_ENTITY):
