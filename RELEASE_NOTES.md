@@ -1,4 +1,49 @@
-# Release Notes - v2025.12.22.3
+# intuiHEMS Release Notes
+
+## v2026.02.06.1 - Battery Power Monitoring & SolarEdge Refinements
+
+**Released:** February 6, 2026
+
+### What's New
+
+#### 🔋 Battery Power Sensor Support
+You can now configure a battery power sensor for real-time monitoring. The integration will:
+- Auto-detect battery power sensors during setup
+- Use the sensor for execution feedback to improve optimization accuracy
+- Fall back to `sensor.battery_power` if not explicitly configured
+
+**How to configure:** Go to Settings → Devices & Services → intuiHEMS → Configure, then select your battery power sensor from the dropdown.
+
+#### ⚡ Improved SolarEdge Control Precision
+SolarEdge inverters require power limits in 100W increments. This release ensures all power commands are properly rounded:
+- New conversion function rounds to nearest 100W
+- More accurate battery charge/discharge control
+- Better logging shows exact Watt values sent to inverter
+
+#### 🌐 Localized SolarEdge Mode Names
+SolarEdge users with non-English HA installations can now use localized mode names:
+- Integration respects your configured mode names from setup
+- Example: Use "Maximaler Eigenverbrauch" instead of "Maximize Self Consumption"
+- No more mode name conflicts!
+
+### Bug Fixes
+- Removed arbitrary 50kW power limit in generic battery control that could reject valid commands
+- Now properly validates against your configured battery max power
+
+### Upgrade Instructions
+1. Update the integration via HACS or manually replace files
+2. Restart Home Assistant
+3. *(Optional)* Reconfigure to add battery power sensor: Settings → Devices & Services → intuiHEMS → Configure
+
+### Technical Changes
+- Added `CONF_BATTERY_POWER_ENTITY` configuration key
+- New `kw_to_watts_rounded100()` helper function for SolarEdge
+- Enhanced logging with `is_solaredge` detection and Watts display
+- 4 files modified: `battery_control.py`, `config_flow.py`, `const.py`, `__init__.py`
+
+---
+
+## v2025.12.22.3
 
 ## 🐛 Critical Fix: 15-Minute Execution Timing Bug
 

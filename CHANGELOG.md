@@ -5,6 +5,44 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.02.06.1] - 2026-02-06
+
+### Changed
+- **SolarEdge Power Conversion Precision**
+  - New helper function `kw_to_watts_rounded100()` ensures power values are always rounded to nearest 100W
+  - SolarEdge inverters require power limits in 100W increments - improves control accuracy
+  - Applied consistently across all SolarEdge control commands (force_charge, self_use, backup)
+  - Enhanced logging with detailed power values in Watts for better troubleshooting
+
+### Added
+- **Battery Power Sensor Configuration**
+  - New config field `battery_power_entity` for real-time battery power monitoring
+  - Auto-detection during setup searches device registry for battery power sensors
+  - Used for execution feedback telemetry to backend
+  - Improves closed-loop optimization accuracy
+  
+- **User-Configured Mode Names for SolarEdge**
+  - SolarEdge command mode now uses user-configured mode mappings from setup
+  - Respects custom mode names instead of hardcoded English strings
+  - Example: Users can map to localized mode names like "Maximaler Eigenverbrauch"
+  
+- **Enhanced SolarEdge Logging**
+  - Integration startup logs SolarEdge system detection
+  - Control execution logs include command mode names and power values in Watts
+  - Better visibility into what commands are sent to inverter
+
+### Fixed
+- **Generic Battery Control Power Clamping**
+  - Removed arbitrary 50kW upper limit that could reject valid MPC power setpoints
+  - Now properly validates against configured battery max power
+  - Safety: Still enforces 0kW minimum
+
+### Technical Details
+- Power conversion formula: `int((abs(power_kw) * 1000 + 50) // 100 * 100)` rounds to nearest 100W
+- Battery power sensor fallback: `sensor.battery_power` if not configured
+- SolarEdge mode mapping: Uses `mode_self_use`, `mode_backup`, `mode_force_charge` from config
+- Files modified: `battery_control.py` (+45, -23), `config_flow.py` (+28, -1), `const.py` (+1), `__init__.py` (+4)
+
 ## [2026.02.05.2] - 2026-02-05
 
 ### Added
