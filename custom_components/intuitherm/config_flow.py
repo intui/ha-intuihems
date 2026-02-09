@@ -504,13 +504,11 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             ]
 
                         #Optional SolarEdge command mode select
-                        if control_entities.get("solaredge_command_mode"):
-                            self._detected_entities["solaredge_command_mode"] = control_entities[
-                                "solaredge_command_mode"
+                        if control_entities.get(CONF_SOLAREDGE_COMMAND_MODE):
+                            self._detected_entities[CONF_SOLAREDGE_COMMAND_MODE] = control_entities[
+                                CONF_SOLAREDGE_COMMAND_MODE
                             ]
-                            _LOGGER.info("  Found SolarEdge command mode select: %s", sensors["control_entities"]["solaredge_command_mode"])
-                        else:
-                            _LOGGER.warning("   SolarEdge command mode select not found")
+                            _LOGGER.info("  Found SolarEdge command mode select: %s", self._detected_entities[CONF_SOLAREDGE_COMMAND_MODE])
 
                     # Log what we found on this device
                     _LOGGER.info("  Found on device:")
@@ -2071,6 +2069,10 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if learned_patterns.get(CONF_BATTERY_DISCHARGE_POWER):
                 self._detected_entities[CONF_BATTERY_DISCHARGE_POWER] = learned_patterns[
                     CONF_BATTERY_DISCHARGE_POWER
+                ]
+            if learned_patterns.get(CONF_SOLAREDGE_COMMAND_MODE):
+                self._detected_entities[CONF_SOLAREDGE_COMMAND_MODE] = learned_patterns[
+                    CONF_SOLAREDGE_COMMAND_MODE
                 ]
 
     async def _get_all_energy_sensors(self) -> dict[str, list[dict[str, Any]]]:
