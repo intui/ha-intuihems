@@ -285,6 +285,80 @@ class BatteryControlExecutor:
         except Exception as e:
             _LOGGER.error(f"Error executing battery control: {e}", exc_info=True)
 
+    async def _call_service_resilient(
+        self,
+        domain: str,
+        service: str,
+        service_data: dict,
+        verify_entity: str | None = None,
+        verify_value: str | float | None = None,
+        description: str = "",
+        retries: int = 2,
+    ) -> bool:
+        """
+        Call a HA service with Modbus I/O error resilience.
+
+        On Modbus I/O errors:
+        1. Wait for state to propagate
+        2. Verify the entity state matches the expected value
+        3. If verified, treat as success; otherwise retry up to `retries` times
+
+        Returns True if the service call succeeded (or state was verified).
+        """
+        for attempt in range(1, retries + 1):
+            try:
+                await self.hass.services.async_call(
+                    domain, service, service_data, blocking=True,
+                )
+                _LOGGER.debug(f"✓ {description} succeeded on attempt {attempt}")
+                return True
+            except Exception as e:
+                error_str = str(e)
+                is_modbus_io = "No Response received" in error_str or "Input/Output" in error_str
+
+                if is_modbus_io and verify_entity and verify_value is not None:
+                    _LOGGER.warning(
+                        f"Modbus I/O error on {description} (attempt {attempt}/{retries}): {e}. "
+                        f"Verifying entity state..."
+                    )
+                    await asyncio.sleep(3)
+
+                    state = self.hass.states.get(verify_entity)
+                    if state:
+                        actual = state.state
+                        # For number entities, compare numerically
+                        try:
+                            if abs(float(actual) - float(verify_value)) < 0.1:
+                                _LOGGER.info(
+                                    f"✓ {description}: entity {verify_entity} confirms "
+                                    f"value={actual} (expected {verify_value}) despite Modbus error"
+                                )
+                                return True
+                        except (ValueError, TypeError):
+                            pass
+                        # For select entities, compare strings
+                        if str(actual) == str(verify_value):
+                            _LOGGER.info(
+                                f"✓ {description}: entity {verify_entity} confirms "
+                                f"state={actual} despite Modbus error"
+                            )
+                            return True
+
+                    _LOGGER.warning(
+                        f"✗ {description}: entity {verify_entity} state={state.state if state else 'N/A'} "
+                        f"!= expected {verify_value} (attempt {attempt}/{retries})"
+                    )
+                    if attempt < retries:
+                        await asyncio.sleep(2)
+                        continue
+                else:
+                    # Non-Modbus error or no verification possible
+                    _LOGGER.error(f"✗ {description} failed: {e}", exc_info=True)
+                    return False
+
+        _LOGGER.error(f"✗ {description} failed after {retries} attempts")
+        return False
+
     async def _apply_control(self, mode: str, power_kw: float) -> bool:
         """
         Apply battery control to HA entities.
@@ -407,32 +481,29 @@ class BatteryControlExecutor:
                     # Generic procedure for non-Huawei systems (FoxESS, Solis, etc.)
                     _LOGGER.info(f"Using generic force charge for {power_kw}kW")
                     
-                    # Set to Force Charge mode
-                    await self.hass.services.async_call(
-                        "select",
-                        "select_option",
-                        {
-                            "entity_id": self.battery_mode_select,
-                            "option": self.mode_force_charge,
-                        },
-                        blocking=True,
+                    # Step 1: Set to Force Charge mode (with Modbus resilience)
+                    mode_ok = await self._call_service_resilient(
+                        "select", "select_option",
+                        {"entity_id": self.battery_mode_select, "option": self.mode_force_charge},
+                        verify_entity=self.battery_mode_select,
+                        verify_value=self.mode_force_charge,
+                        description=f"Set work mode to {self.mode_force_charge}",
                     )
+                    if not mode_ok:
+                        return False
                     
-                    # Set charge power if entity exists
+                    # Step 2: Set charge power if entity exists (with Modbus resilience)
                     if self.battery_charge_power:
-                        # MPC might send power > configured max, clamp to 0-50kW as safety range
                         power_value = max(0.0, float(power_kw))
-                        
-                        await self.hass.services.async_call(
-                            "number",
-                            "set_value",
-                            {
-                                "entity_id": self.battery_charge_power,
-                                "value": round(power_value, 2),
-                            },
-                            blocking=True,
+                        power_ok = await self._call_service_resilient(
+                            "number", "set_value",
+                            {"entity_id": self.battery_charge_power, "value": round(power_value, 2)},
+                            verify_entity=self.battery_charge_power,
+                            verify_value=round(power_value, 2),
+                            description=f"Set charge power to {power_value}kW",
                         )
-                        _LOGGER.debug(f"Set charge power to {power_value}kW")
+                        if not power_ok:
+                            _LOGGER.warning(f"Charge power set failed, but mode was set successfully")
                     
                     _LOGGER.info(f"Applied Force Charge mode ({self.mode_force_charge}) with {power_kw}kW")
                 
@@ -522,15 +593,15 @@ class BatteryControlExecutor:
 
                 else:
                     # Generic procedure for non-Huawei systems
-                    await self.hass.services.async_call(
-                        "select",
-                        "select_option",
-                        {
-                            "entity_id": self.battery_mode_select,
-                            "option": self.mode_self_use,
-                        },
-                        blocking=True,
+                    mode_ok = await self._call_service_resilient(
+                        "select", "select_option",
+                        {"entity_id": self.battery_mode_select, "option": self.mode_self_use},
+                        verify_entity=self.battery_mode_select,
+                        verify_value=self.mode_self_use,
+                        description=f"Set work mode to {self.mode_self_use}",
                     )
+                    if not mode_ok:
+                        return False
                     
                     _LOGGER.info(f"Applied Self Use mode ({self.mode_self_use})")
                 
@@ -615,15 +686,15 @@ class BatteryControlExecutor:
                     _LOGGER.info(f"Applied SolarEdge backup (Discharge Blocked / Charge Allowed) Command Mode: {self.mode_backup} Charge Power: {max_power_watts}W")
                 else:
                     # Generic procedure for non-Huawei systems
-                    await self.hass.services.async_call(
-                        "select",
-                        "select_option",
-                        {
-                            "entity_id": self.battery_mode_select,
-                            "option": self.mode_backup,
-                        },
-                        blocking=True,
+                    mode_ok = await self._call_service_resilient(
+                        "select", "select_option",
+                        {"entity_id": self.battery_mode_select, "option": self.mode_backup},
+                        verify_entity=self.battery_mode_select,
+                        verify_value=self.mode_backup,
+                        description=f"Set work mode to {self.mode_backup}",
                     )
+                    if not mode_ok:
+                        return False
                     
                     _LOGGER.info(f"Applied Backup mode ({self.mode_backup})")
             
