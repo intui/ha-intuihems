@@ -634,6 +634,40 @@ class BatteryControlExecutor:
             return True
         
         except Exception as e:
+            # Modbus I/O errors often mean the write succeeded but the response was lost.
+            # Verify actual entity state before declaring failure.
+            error_str = str(e)
+            is_modbus_io_error = "No Response received" in error_str or "Input/Output" in error_str
+            
+            if is_modbus_io_error and self.battery_mode_select:
+                _LOGGER.warning(
+                    f"Modbus I/O error for {mode} - command may have succeeded. "
+                    f"Verifying entity state after brief delay..."
+                )
+                await asyncio.sleep(3)
+                
+                # Check if the mode entity reflects the target state
+                state = self.hass.states.get(self.battery_mode_select)
+                if state:
+                    current_mode_value = state.state
+                    expected_mode = {
+                        "force_charge": self.mode_force_charge,
+                        "self_use": self.mode_self_use,
+                        "backup": self.mode_backup,
+                    }.get(mode)
+                    
+                    if current_mode_value == expected_mode:
+                        _LOGGER.info(
+                            f"✓ Entity state confirms {mode} was applied successfully "
+                            f"despite Modbus I/O error (state={current_mode_value})"
+                        )
+                        return True
+                    else:
+                        _LOGGER.error(
+                            f"✗ Entity state mismatch after Modbus error: "
+                            f"expected={expected_mode}, actual={current_mode_value}"
+                        )
+            
             _LOGGER.error(f"Error applying control {mode}: {e}", exc_info=True)
             return False
 
