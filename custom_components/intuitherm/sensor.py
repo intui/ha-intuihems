@@ -486,7 +486,6 @@ class IntuiThermConsumptionForecastSensor(IntuiThermSensorBase):
 
         return {
             "forecast": forecast_data.get("forecast", []),
-            "historical": forecast_data.get("historical", []),
             "generated_at": forecast_data.get("generated_at"),
             "forecast_method": forecast_data.get("forecast_method"),
             "unit": "kW",
@@ -533,7 +532,6 @@ class IntuiThermSolarForecastSensor(IntuiThermSensorBase):
 
         return {
             "forecast": forecast_data.get("forecast", []),
-            "historical": forecast_data.get("historical", []),
             "generated_at": forecast_data.get("generated_at"),
             "forecast_method": forecast_data.get("forecast_method"),
             "unit": "kW",

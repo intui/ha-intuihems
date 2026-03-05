@@ -5,6 +5,28 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.03.05.1] - 2026-03-05
+
+### Fixed
+- **Forecast sensor attributes exceeding HA Recorder 16 KB limit**
+  - `sensor.consumption_forecast` and `sensor.solar_forecast` were embedding up to 3 days
+    of historical readings (~11.5 KB each) in their state attributes on every coordinator
+    poll, causing HA Recorder to refuse storing them and log repeated warnings.
+  - Removed the `historical` key from both sensors' `extra_state_attributes`.
+    HA already records the full state history natively — no duplication needed.
+  - The `forecast` array (96 × 15-min steps, ~3.8 KB) is kept for ApexCharts dashboard cards.
+
+### Backend (Cloud Service — no HA update required)
+- **Cost-based MPC with grid export revenue** *(deployed 2026-03-02)*
+  - Replaced the heuristic solar-penalty formulation with a proper cost-minimisation model.
+  - Added `p_grid_export` decision variable and feed-in revenue term to the CVXPY objective:
+    `minimize(import_cost − export_revenue + degradation)`
+  - Equality power balance constraint: `solar + grid_import == load + p_bat + grid_export`
+  - Feed-in price is now read per-user from `UserConfig.feed_in_price_eur_kwh` (default 0.082 EUR/kWh).
+  - Improved mode derivation: `force_charge` only when grid imports exceed net house load.
+  - Solver output now includes `import_cost`, `export_revenue`, `degradation_cost`,
+    and full `grid_import`/`grid_export` profiles for diagnostics.
+
 ## [2026.02.06.1] - 2026-02-06
 
 ### Changed
