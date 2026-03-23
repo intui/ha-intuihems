@@ -5,6 +5,42 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.03.23.1] - 2026-03-23
+
+### Added
+- **Configurable Geo Location**
+  - Installation latitude, longitude, and elevation are auto-detected from Home Assistant during initial setup
+  - Location fields are editable in the options flow for manual correction
+  - Location is synced to backend for weather-based solar forecasting accuracy
+  - New constants: `CONF_LATITUDE`, `CONF_LONGITUDE`, `CONF_ELEVATION`
+
+### Changed
+- **Options Flow Simplified**
+  - User ID removed from options screen (not user-facing information)
+  - Options description updated with Location & Weather section
+
+### Fixed
+- **strings.json Invalid JSON**
+  - Fixed mixed escaped/unescaped quotes throughout `strings.json` that made it unparseable
+  - Fixed broken emoji character in options description
+
+### Backend (Cloud Service — no HA update required)
+- **Tibber API Resilience** *(deployed 2026-03-23)*
+  - Increased Tibber API timeout from 10s to 30s to prevent `asyncio.TimeoutError`
+  - Added retry logic on price fetch failure: retries at 5min, 10min, 20min, 40min intervals
+    instead of sleeping 1h and waiting for next 13:00 CET cycle
+  - Prevents 24h+ price data gaps from transient API failures
+- **Location API**
+  - `/api/v1/config` endpoint now accepts `latitude`, `longitude`, `elevation` fields
+  - Updates active Installation record with new coordinates
+  - Validation: lat [-90,90], lon [-180,180], elevation [0,9000]
+
+### Technical Details
+- Config flow stores location in entry data during `async_step_pricing`
+- Options flow defaults to current config values, falls back to HA core location
+- Files modified: `config_flow.py`, `const.py`, `strings.json`, `translations/en.json`, `translations/de.json`, `manifest.json`
+- Backend files: `ha_integration.py` (+24), `tibber.py` (+1, -1), `epex_price_fetcher.py` (+14, -2)
+
 ## [2026.03.05.1] - 2026-03-05
 
 ### Fixed
