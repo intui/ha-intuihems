@@ -5,6 +5,41 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.03.23.1] - 2026-03-23
+
+### Added
+- **Configurable Geo Location**
+  - Installation latitude, longitude, and elevation are now auto-detected from Home Assistant during initial setup
+  - Location fields are editable in the options flow for manual correction
+  - Location is sent to backend for weather-based solar forecasting accuracy
+  - New constants: `CONF_LATITUDE`, `CONF_LONGITUDE`, `CONF_ELEVATION`
+
+### Changed
+- **Options Flow Simplified**
+  - User ID removed from options screen (not user-facing information)
+  - Options description updated with location & weather section
+
+### Fixed
+- **strings.json Invalid JSON**
+  - Fixed mixed escaped/unescaped quotes that made strings.json unparseable
+  - Fixed broken emoji character in options description
+
+### Backend (deployed separately)
+- **Tibber API Resilience**
+  - Increased Tibber API timeout from 10s to 30s to prevent `asyncio.TimeoutError`
+  - Added retry logic on price fetch failure (retries at 5min, 10min, 20min, 40min)
+  - Prevents 24h+ price data gaps from transient API failures
+- **Location API**
+  - `/api/v1/config` endpoint now accepts `latitude`, `longitude`, `elevation` fields
+  - Updates the active Installation record with new coordinates
+
+### Technical Details
+- Config flow stores location in config entry data during `async_step_pricing`
+- Options flow defaults to current config values, falls back to HA core location
+- Backend `ConfigUpdateRequest` validates: lat [-90,90], lon [-180,180], elevation [0,9000]
+- Files modified: `config_flow.py`, `const.py`, `strings.json`, `translations/en.json`, `translations/de.json`, `manifest.json`
+- Backend files: `ha_integration.py`, `tibber.py`, `epex_price_fetcher.py`
+
 ## [2026.02.06.1] - 2026-02-06
 
 ### Changed
