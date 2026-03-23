@@ -101,7 +101,7 @@
     "step": {
       "init": {
         "title": "Configure intuiHEMS Settings",
-        "description": "Reconfigure your intuiHEMS integration settings.\\n\\n📍 Location & Weather\\n📊 Update sensors and battery configuration\\n⚡ Modify battery control entities\\n🔋 Adjust battery specifications",
+        "description": "**Your User ID:** `{user_id}`\\n\\nReconfigure your intuiHEMS integration settings.\\n\\n📍 Location & Weather\\n📊 Update sensors and battery configuration\\n⚡ Modify battery control entities\\n🔋 Adjust battery specifications",
         "data": {
           "latitude": "Latitude",
           "longitude": "Longitude",

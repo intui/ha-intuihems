@@ -2632,6 +2632,9 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(schema),
             errors=errors,
+            description_placeholders={
+                "user_id": current_config.get(CONF_USER_ID, "unknown"),
+            },
         )
     
     async def _update_battery_config(self, config: dict, capacity_kwh: float, max_power_kw: float, latitude: float = None, longitude: float = None, elevation: float = None) -> None:

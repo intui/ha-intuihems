@@ -108,7 +108,7 @@
     "step": {
       "init": {
         "title": "Configure IntuiTherm Options",
-        "description": "Update your IntuiTherm integration settings.",
+        "description": "**Your User ID:** `{user_id}`\n\nUpdate your IntuiTherm integration settings.",
         "data": {
           "latitude": "Latitude",
           "longitude": "Longitude",

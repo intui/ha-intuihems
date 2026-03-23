@@ -70,7 +70,7 @@
     "step": {
       "init": {
         "title": "IntuiTherm Optionen konfigurieren",
-        "description": "Aktualisieren Sie Ihre IntuiTherm-Integrationseinstellungen.",
+        "description": "**Ihre Benutzer-ID:** `{user_id}`\n\nAktualisieren Sie Ihre IntuiTherm-Integrationseinstellungen.",
         "data": {
           "latitude": "Breitengrad",
           "longitude": "Längengrad",
