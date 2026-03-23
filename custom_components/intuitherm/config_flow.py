@@ -49,6 +49,9 @@ from .const import (
     CONF_EPEX_MARKUP,
     CONF_GRID_EXPORT_PRICE,
     CONF_DRY_RUN_MODE,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    CONF_ELEVATION,
     CONF_INSTANCE_ID,
     CONF_USER_ID,
     CONF_USER_EMAIL,
@@ -1039,6 +1042,9 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_USER_EMAIL: self._user_email,
                         CONF_MARKETING_CONSENT: self._marketing_consent,
                         CONF_SAVINGS_REPORT_CONSENT: self._savings_report_consent,
+                        CONF_LATITUDE: self.hass.config.latitude,
+                        CONF_LONGITUDE: self.hass.config.longitude,
+                        CONF_ELEVATION: self.hass.config.elevation,
                     },
                 )
         
@@ -2276,6 +2282,9 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_DETECTED_ENTITIES: detected_entities,
                     CONF_BATTERY_CAPACITY: user_input.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
                     CONF_BATTERY_MAX_POWER: user_input.get(CONF_BATTERY_MAX_POWER, DEFAULT_BATTERY_MAX_POWER),
+                    CONF_LATITUDE: user_input.get(CONF_LATITUDE, current_config.get(CONF_LATITUDE)),
+                    CONF_LONGITUDE: user_input.get(CONF_LONGITUDE, current_config.get(CONF_LONGITUDE)),
+                    CONF_ELEVATION: user_input.get(CONF_ELEVATION, current_config.get(CONF_ELEVATION)),
                 }
                 
                 # Send battery configuration to backend
@@ -2283,7 +2292,10 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                     await self._update_battery_config(
                         current_config,
                         options_data[CONF_BATTERY_CAPACITY],
-                        options_data[CONF_BATTERY_MAX_POWER]
+                        options_data[CONF_BATTERY_MAX_POWER],
+                        latitude=options_data.get(CONF_LATITUDE),
+                        longitude=options_data.get(CONF_LONGITUDE),
+                        elevation=options_data.get(CONF_ELEVATION),
                     )
                 except Exception as err:
                     _LOGGER.warning("Failed to update battery config on backend: %s", err)
@@ -2340,6 +2352,18 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
         # Build schema with current values as defaults
         # Note: Service URL and API key are not user-configurable (registered during setup)
         schema = {
+            vol.Required(
+                CONF_LATITUDE,
+                default=current_config.get(CONF_LATITUDE, self.hass.config.latitude),
+            ): vol.All(vol.Coerce(float), vol.Range(min=-90.0, max=90.0)),
+            vol.Required(
+                CONF_LONGITUDE,
+                default=current_config.get(CONF_LONGITUDE, self.hass.config.longitude),
+            ): vol.All(vol.Coerce(float), vol.Range(min=-180.0, max=180.0)),
+            vol.Optional(
+                CONF_ELEVATION,
+                default=current_config.get(CONF_ELEVATION, self.hass.config.elevation) or 0.0,
+            ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=9000.0)),
             vol.Required(
                 CONF_BATTERY_CAPACITY,
                 default=current_config.get(CONF_BATTERY_CAPACITY, DEFAULT_BATTERY_CAPACITY),
@@ -2608,12 +2632,9 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(schema),
             errors=errors,
-            description_placeholders={
-                "user_id": current_config.get(CONF_USER_ID, "not-set")
-            },
         )
     
-    async def _update_battery_config(self, config: dict, capacity_kwh: float, max_power_kw: float) -> None:
+    async def _update_battery_config(self, config: dict, capacity_kwh: float, max_power_kw: float, latitude: float = None, longitude: float = None, elevation: float = None) -> None:
         """Update battery configuration on the backend."""
         service_url = config.get(CONF_SERVICE_URL, DEFAULT_SERVICE_URL)
         api_key = config.get(CONF_API_KEY)
@@ -2629,6 +2650,14 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             "battery_capacity_kwh": capacity_kwh,
             "battery_max_power_kw": max_power_kw
         }
+        
+        # Include location if provided
+        if latitude is not None:
+            payload["latitude"] = latitude
+        if longitude is not None:
+            payload["longitude"] = longitude
+        if elevation is not None:
+            payload["elevation"] = elevation
         
         # Include battery control entities if configured (stored as device presets)
         detected_entities = config.get(CONF_DETECTED_ENTITIES, {})

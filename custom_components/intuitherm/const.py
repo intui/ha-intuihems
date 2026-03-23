@@ -79,6 +79,11 @@ CONF_BATTERY_CHARGE_MAX_POWER: Final = "battery_charge_max_power_kw"  # Max char
 # House load configuration
 CONF_HOUSE_LOAD_CALC_MODE: Final = "house_load_calc_mode"  # "auto" or "manual"
 
+# Location configuration (auto-detected from HA, editable in options)
+CONF_LATITUDE: Final = "latitude"
+CONF_LONGITUDE: Final = "longitude"
+CONF_ELEVATION: Final = "elevation"
+
 # Pricing configuration
 CONF_EPEX_MARKUP: Final = "epex_markup"  # Additional cost on top of EPEX day-ahead price (€/kWh)
 CONF_GRID_EXPORT_PRICE: Final = "grid_export_price"  # Feed-in tariff (€/kWh)

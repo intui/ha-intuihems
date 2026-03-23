@@ -108,8 +108,11 @@
     "step": {
       "init": {
         "title": "Configure IntuiTherm Options",
-        "description": "Update your IntuiTherm integration settings.\n\n**Your User ID:** `{user_id}`",
+        "description": "Update your IntuiTherm integration settings.",
         "data": {
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "elevation": "Elevation (m)",
           "battery_capacity_kwh": "Battery Capacity (kWh)",
           "battery_max_power_kw": "Battery Max Power (kW)",
           "battery_soc_entity": "Battery State of Charge (%)",
@@ -122,6 +125,9 @@
           "mode_force_charge": "Force Charge Mode Name"
         },
         "data_description": {
+          "latitude": "Latitude of your installation. Used for weather-based solar forecasting.",
+          "longitude": "Longitude of your installation. Used for weather-based solar forecasting.",
+          "elevation": "Elevation above sea level in meters. Used for solar angle calculations.",
           "battery_capacity_kwh": "Total usable battery capacity in kilowatt-hours. This is the amount of energy your battery can store and use. Example: Enter 10 for a 10 kWh battery system.",
           "battery_max_power_kw": "Maximum charging/discharging rate in kilowatts. This limits how fast the battery can charge or discharge. Example: Enter 3 for a 3 kW inverter.",
           "battery_soc_entity": "Sensor showing battery charge percentage (0-100%). Tracks how full your battery currently is. Used to optimize charging decisions.",

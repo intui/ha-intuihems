@@ -70,8 +70,11 @@
     "step": {
       "init": {
         "title": "IntuiTherm Optionen konfigurieren",
-        "description": "Aktualisieren Sie Ihre IntuiTherm-Integrationseinstellungen.\n\n**Ihre Benutzer-ID:** `{user_id}`",
+        "description": "Aktualisieren Sie Ihre IntuiTherm-Integrationseinstellungen.",
         "data": {
+          "latitude": "Breitengrad",
+          "longitude": "Längengrad",
+          "elevation": "Höhe (m)",
           "battery_capacity_kwh": "Batteriekapazität (kWh)",
           "battery_max_power_kw": "Max. Batterieleistung (kW)",
           "battery_soc_entity": "Batterieladezustand (%)",
@@ -84,6 +87,9 @@
           "mode_force_charge": "Zwangsladung-Modusname"
         },
         "data_description": {
+          "latitude": "Breitengrad Ihrer Installation. Wird für wetterbasierte Solarprognosen verwendet.",
+          "longitude": "Längengrad Ihrer Installation. Wird für wetterbasierte Solarprognosen verwendet.",
+          "elevation": "Höhe über dem Meeresspiegel in Metern. Wird für Sonnenwinkelberechnungen verwendet.",
           "battery_capacity_kwh": "Gesamte nutzbare Batteriekapazität in Kilowattstunden. Dies ist die Energiemenge, die Ihre Batterie speichern und nutzen kann. Beispiel: 10 für ein 10 kWh Batteriesystem eingeben.",
           "battery_max_power_kw": "Maximale Lade-/Entladeleistung in Kilowatt. Begrenzt, wie schnell die Batterie laden oder entladen kann. Beispiel: 3 für einen 3 kW Wechselrichter eingeben.",
           "battery_soc_entity": "Sensor, der den Batterieladezustand in Prozent anzeigt (0-100%). Zeigt an, wie voll Ihre Batterie aktuell ist. Wird zur Optimierung der Ladeentscheidungen verwendet.",

@@ -40,47 +40,47 @@
         }
       },
       "pricing": {
-        \"title\": \"Configure Dynamic Pricing & Battery Specs\",
-        \"description\": \"intuiHEMS uses EPEX Day-Ahead spot prices for optimization.\\n\\n💶 Enter your additional costs on top of the spot price\\n📊 These values help calculate the most cost-effective battery strategy\\n🔋 Configure your battery specifications\\n\\n✨ Historic data will be collected automatically on first run\",
-        \"data\": {
-          \"battery_capacity\": \"Battery Capacity (kWh)\",
-          \"battery_max_power\": \"Battery Max Power (kW)\",
-          \"epex_markup\": \"Grid Import Markup (€/kWh)\",
-          \"dry_run_mode\": \"Dry Run Mode (No Battery Control)\"
+        "title": "Configure Dynamic Pricing & Battery Specs",
+        "description": "intuiHEMS uses EPEX Day-Ahead spot prices for optimization.\\n\\n💶 Enter your additional costs on top of the spot price\\n📊 These values help calculate the most cost-effective battery strategy\\n🔋 Configure your battery specifications\\n\\n✨ Historic data will be collected automatically on first run",
+        "data": {
+          "battery_capacity": "Battery Capacity (kWh)",
+          "battery_max_power": "Battery Max Power (kW)",
+          "epex_markup": "Grid Import Markup (€/kWh)",
+          "dry_run_mode": "Dry Run Mode (No Battery Control)"
         },
-        \"data_description\": {
-          \"battery_capacity\": \"Usable capacity of your battery in kWh. For example, if your battery is 13.5 kWh with 90% usable capacity, enter 12.15 kWh. This is used to calculate optimal charge/discharge strategies.\",
-          \"battery_max_power\": \"Maximum charging and discharging power in kW. For example, if your battery can charge at 5 kW and discharge at 5 kW, enter 5.0. This limits optimization to realistic power levels.\",
-          \"epex_markup\": \"Additional cost you pay on top of EPEX spot price (taxes, distribution fees, supplier margin). For example, if spot price is 0.10 €/kWh and you pay 0.25 €/kWh total, enter 0.15 €/kWh.\",
-          \"dry_run_mode\": \"Enable to see optimization recommendations without controlling your battery. Perfect for testing! When enabled, you'll see what the system would do, but it won't actually change battery modes.\"
+        "data_description": {
+          "battery_capacity": "Usable capacity of your battery in kWh. For example, if your battery is 13.5 kWh with 90% usable capacity, enter 12.15 kWh. This is used to calculate optimal charge/discharge strategies.",
+          "battery_max_power": "Maximum charging and discharging power in kW. For example, if your battery can charge at 5 kW and discharge at 5 kW, enter 5.0. This limits optimization to realistic power levels.",
+          "epex_markup": "Additional cost you pay on top of EPEX spot price (taxes, distribution fees, supplier margin). For example, if spot price is 0.10 €/kWh and you pay 0.25 €/kWh total, enter 0.15 €/kWh.",
+          "dry_run_mode": "Enable to see optimization recommendations without controlling your battery. Perfect for testing! When enabled, you'll see what the system would do, but it won't actually change battery modes."
         }
       },
-      \"battery_control\": {
-        \"title\": \"Battery Control Entities (Optional)\",
-        \"description\": \"Configure entities to enable automatic battery control based on MPC optimization.\\n\\n⚡ Leave empty to run in monitoring-only mode\\n🎯 These entities will be controlled automatically every 15 minutes\\n\\n{info}\",
-        \"data\": {
-          \"battery_mode_select\": \"Battery Mode Select\",
-          \"battery_charge_power\": \"Battery Charge Power Control\",
-          \"battery_discharge_power\": \"Battery Discharge Power Control\"
+      "battery_control": {
+        "title": "Battery Control Entities (Optional)",
+        "description": "Configure entities to enable automatic battery control based on MPC optimization.\\n\\n⚡ Leave empty to run in monitoring-only mode\\n🎯 These entities will be controlled automatically every 15 minutes\\n\\n{info}",
+        "data": {
+          "battery_mode_select": "Battery Mode Select",
+          "battery_charge_power": "Battery Charge Power Control",
+          "battery_discharge_power": "Battery Discharge Power Control"
         },
-        \"data_description\": {
-          \"battery_mode_select\": \"Select entity that controls battery operating mode (e.g., select.work_mode, select.battery_mode). The integration will switch between modes like Self Use, Backup, and Force Charge based on optimization. Required for automatic battery control.\",
-          \"battery_charge_power\": \"Number entity to set maximum charging power (e.g., number.max_charge_current, number.charge_power_limit). Used to control how fast the battery charges. For FoxESS inverters, this is typically in Amperes and will be converted automatically.\",
-          \"battery_discharge_power\": \"Number entity to set maximum discharge power (e.g., number.max_discharge_current, number.discharge_power_limit). Used to control how fast the battery discharges. Optional - leave empty if your inverter doesn't support this.\"
+        "data_description": {
+          "battery_mode_select": "Select entity that controls battery operating mode (e.g., select.work_mode, select.battery_mode). The integration will switch between modes like Self Use, Backup, and Force Charge based on optimization. Required for automatic battery control.",
+          "battery_charge_power": "Number entity to set maximum charging power (e.g., number.max_charge_current, number.charge_power_limit). Used to control how fast the battery charges. For FoxESS inverters, this is typically in Amperes and will be converted automatically.",
+          "battery_discharge_power": "Number entity to set maximum discharge power (e.g., number.max_discharge_current, number.discharge_power_limit). Used to control how fast the battery discharges. Optional - leave empty if your inverter doesn't support this."
         }
       },
-      \"mode_mapping\": {
-        \"title\": \"Battery Mode Mapping\",
-        \"description\": \"Map MPC control actions to your inverter's specific mode names.\\n\\n🔄 Different inverter brands use different mode names\\n📝 Select the exact option that matches each control action\\n\\nFor example:\\n• Self Use = Battery charges from solar, powers house\\n• Backup = Battery reserved for emergencies\\n• Force Charge = Battery charges from grid\",
-        \"data\": {
-          \"mode_self_use\": \"Self Use Mode Name\",
-          \"mode_backup\": \"Backup Mode Name\",
-          \"mode_force_charge\": \"Force Charge Mode Name\"
+      "mode_mapping": {
+        "title": "Battery Mode Mapping",
+        "description": "Map MPC control actions to your inverter's specific mode names.\\n\\n🔄 Different inverter brands use different mode names\\n📝 Select the exact option that matches each control action\\n\\nFor example:\\n• Self Use = Battery charges from solar, powers house\\n• Backup = Battery reserved for emergencies\\n• Force Charge = Battery charges from grid",
+        "data": {
+          "mode_self_use": "Self Use Mode Name",
+          "mode_backup": "Backup Mode Name",
+          "mode_force_charge": "Force Charge Mode Name"
         },
-        \"data_description\": {
-          \"mode_self_use\": \"Select the mode option that represents 'Self Use' on your inverter. This mode allows battery to charge from solar and discharge to house loads, but prevents grid charging. Common names: Self Use, Self Consumption, PV Mode.\",
-          \"mode_backup\": \"Select the mode option that represents 'Backup' on your inverter. This mode reserves battery for backup power and prevents charging from grid. Common names: Backup, UPS Mode, Reserve Mode.\",
-          \"mode_force_charge\": \"Select the mode option that represents 'Force Charge' on your inverter. This mode enables active charging from grid at specified power level. Common names: Force Charge, Grid Charge, Charging Mode.\"
+        "data_description": {
+          "mode_self_use": "Select the mode option that represents 'Self Use' on your inverter. This mode allows battery to charge from solar and discharge to house loads, but prevents grid charging. Common names: Self Use, Self Consumption, PV Mode.",
+          "mode_backup": "Select the mode option that represents 'Backup' on your inverter. This mode reserves battery for backup power and prevents charging from grid. Common names: Backup, UPS Mode, Reserve Mode.",
+          "mode_force_charge": "Select the mode option that represents 'Force Charge' on your inverter. This mode enables active charging from grid at specified power level. Common names: Force Charge, Grid Charge, Charging Mode."
         }
       }
     },
@@ -97,36 +97,42 @@
       "already_configured": "This IntuiTherm service is already configured."
     }
   },
-  \"options\": {
-    \"step\": {
-      \"init\": {
-        \"title\": \"Configure intuiHEMS Settings\",
-        \"description\": \"Reconfigure your intuiHEMS integration settings.\\n\\n📊 Update sensors and battery configuration\\n⚡ Modify battery control entities\\n🔋 Adjust battery specifications\\n\\n**Your User ID:** {user_id}\\n(This ID is used for backend communication and cannot be changed)\",
-        \"data\": {
-          \"battery_capacity\": \"Battery Capacity (kWh)\",
-          \"battery_max_power\": \"Battery Max Power (kW)\",
-          \"epex_markup\": \"Grid Import Markup (€/kWh)\",
-          \"battery_soc_entity\": \"Battery State of Charge (%)\",
-          \"solar_power_entity\": \"Solar Energy Total (kWh)\",
-          \"house_load_entity\": \"House Energy Consumption (kWh)\",
-          \"battery_mode_select\": \"Battery Mode Select\",
-          \"battery_charge_power\": \"Battery Charge Power Control\",
-          \"mode_self_use\": \"Self Use Mode Name\",
-          \"mode_backup\": \"Backup Mode Name\",
-          \"mode_force_charge\": \"Force Charge Mode Name\"
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configure intuiHEMS Settings",
+        "description": "Reconfigure your intuiHEMS integration settings.\\n\\n📍 Location & Weather\\n📊 Update sensors and battery configuration\\n⚡ Modify battery control entities\\n🔋 Adjust battery specifications",
+        "data": {
+          "latitude": "Latitude",
+          "longitude": "Longitude",
+          "elevation": "Elevation (m)",
+          "battery_capacity": "Battery Capacity (kWh)",
+          "battery_max_power": "Battery Max Power (kW)",
+          "epex_markup": "Grid Import Markup (€/kWh)",
+          "battery_soc_entity": "Battery State of Charge (%)",
+          "solar_power_entity": "Solar Energy Total (kWh)",
+          "house_load_entity": "House Energy Consumption (kWh)",
+          "battery_mode_select": "Battery Mode Select",
+          "battery_charge_power": "Battery Charge Power Control",
+          "mode_self_use": "Self Use Mode Name",
+          "mode_backup": "Backup Mode Name",
+          "mode_force_charge": "Force Charge Mode Name"
         },
-        \"data_description\": {
-          \"battery_capacity\": \"Usable capacity of your battery in kWh. For example, if your battery is 13.5 kWh with 90% usable capacity, enter 12.15 kWh. This is used to calculate optimal charge/discharge strategies.\",
-          \"battery_max_power\": \"Maximum charging and discharging power in kW. For example, if your battery can charge at 5 kW and discharge at 5 kW, enter 5.0. This limits optimization to realistic power levels.\",
-          \"epex_markup\": \"Additional cost you pay on top of EPEX spot price (taxes, distribution fees, supplier margin). For example, if spot price is 0.10 €/kWh and you pay 0.25 €/kWh total, enter 0.15 €/kWh.\",
-          \"battery_soc_entity\": \"Sensor showing battery charge percentage (0-100%). This must be a percentage sensor. Example: sensor.battery_soc, sensor.battery_level.\",
-          \"solar_power_entity\": \"Cumulative solar energy production sensor (kWh, total_increasing preferred). The integration will automatically calculate power from energy readings. Example: sensor.solar_energy_total.\",
-          \"house_load_entity\": \"Cumulative house energy consumption sensor (kWh, total_increasing). Used to track total energy usage. Example: sensor.house_consumption_total.\",
-          \"battery_mode_select\": \"Select entity that controls battery operating mode (e.g., select.work_mode). Required for automatic battery control. Leave empty for monitoring-only mode.\",
-          \"battery_charge_power\": \"Number entity to set maximum charging power (e.g., number.max_charge_current). Used to control charging speed. Leave empty if not available.\",
-          \"mode_self_use\": \"The exact option name in your battery mode select for Self Use mode (battery charges from solar only). Example: 'Self Use', 'Self Consumption', 'PV Mode'.\",
-          \"mode_backup\": \"The exact option name in your battery mode select for Backup mode (battery reserved for backup power). Example: 'Backup', 'UPS Mode', 'Reserve'.\",
-          \"mode_force_charge\": \"The exact option name in your battery mode select for Force Charge mode (battery charges from grid). Example: 'Force Charge', 'Grid Charge', 'Charging'.\"
+        "data_description": {
+          "latitude": "Latitude of your installation. Used for weather-based solar forecasting.",
+          "longitude": "Longitude of your installation. Used for weather-based solar forecasting.",
+          "elevation": "Elevation above sea level in meters. Used for solar angle calculations.",
+          "battery_capacity": "Usable capacity of your battery in kWh. For example, if your battery is 13.5 kWh with 90% usable capacity, enter 12.15 kWh. This is used to calculate optimal charge/discharge strategies.",
+          "battery_max_power": "Maximum charging and discharging power in kW. For example, if your battery can charge at 5 kW and discharge at 5 kW, enter 5.0. This limits optimization to realistic power levels.",
+          "epex_markup": "Additional cost you pay on top of EPEX spot price (taxes, distribution fees, supplier margin). For example, if spot price is 0.10 €/kWh and you pay 0.25 €/kWh total, enter 0.15 €/kWh.",
+          "battery_soc_entity": "Sensor showing battery charge percentage (0-100%). This must be a percentage sensor. Example: sensor.battery_soc, sensor.battery_level.",
+          "solar_power_entity": "Cumulative solar energy production sensor (kWh, total_increasing preferred). The integration will automatically calculate power from energy readings. Example: sensor.solar_energy_total.",
+          "house_load_entity": "Cumulative house energy consumption sensor (kWh, total_increasing). Used to track total energy usage. Example: sensor.house_consumption_total.",
+          "battery_mode_select": "Select entity that controls battery operating mode (e.g., select.work_mode). Required for automatic battery control. Leave empty for monitoring-only mode.",
+          "battery_charge_power": "Number entity to set maximum charging power (e.g., number.max_charge_current). Used to control charging speed. Leave empty if not available.",
+          "mode_self_use": "The exact option name in your battery mode select for Self Use mode (battery charges from solar only). Example: 'Self Use', 'Self Consumption', 'PV Mode'.",
+          "mode_backup": "The exact option name in your battery mode select for Backup mode (battery reserved for backup power). Example: 'Backup', 'UPS Mode', 'Reserve'.",
+          "mode_force_charge": "The exact option name in your battery mode select for Force Charge mode (battery charges from grid). Example: 'Force Charge', 'Grid Charge', 'Charging'."
         }
       }
     }
