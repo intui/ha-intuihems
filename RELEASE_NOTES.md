@@ -1,5 +1,59 @@
 # intuiHEMS Release Notes
 
+## v2026.03.23.1 - Configurable Location & Tibber Resilience
+
+**Released:** March 23, 2026
+
+### What's New
+
+#### 📍 Configurable Geo Location
+Your installation's geographic coordinates are now part of the integration config and can be edited at any time.
+
+- **Auto-detected on setup**: Latitude, longitude, and elevation are pulled from your Home Assistant core configuration during initial setup
+- **Editable in options**: Go to Configure to adjust coordinates if your HA location doesn't match your solar installation site
+- **Synced to backend**: Coordinates are sent to the cloud for weather-based solar forecast accuracy
+
+**Why this matters:** Solar forecasting uses your exact coordinates to calculate sun angles, cloud cover, and irradiance. If your HA instance uses a city-center location rather than your actual rooftop coordinates, forecast accuracy suffers. Now you can correct this without reconfiguring HA itself.
+
+#### 🔧 Options Flow Cleanup
+- User ID removed from the options screen (internal debug info, not useful to end users)
+- Description updated to highlight Location & Weather configuration
+
+### Bug Fixes
+- Fixed `strings.json` containing invalid JSON (mixed escaped/unescaped quotes) that could cause issues with translation loading
+- Fixed broken emoji character in options description
+
+### Backend Changes (deployed separately)
+- **Tibber API timeout** increased from 10s to 30s to prevent `asyncio.TimeoutError`
+- **Price fetch retry logic**: On failure, retries at 5, 10, 20, 40 minute intervals instead of waiting 24h for next cycle
+- **Location API**: `/api/v1/config` endpoint now accepts latitude, longitude, elevation updates
+
+### Upgrade Instructions
+1. Update the integration via HACS or manually replace files
+2. Restart Home Assistant
+3. Go to Settings → Integrations → intuiHEMS → Configure to review your location settings
+
+### Technical Changes
+- New constants: `CONF_LATITUDE`, `CONF_LONGITUDE`, `CONF_ELEVATION`
+- Config flow stores location in entry data during `async_step_pricing`
+- Options flow defaults to current config values, falls back to HA core location
+- Backend validates: lat [-90,90], lon [-180,180], elevation [0,9000]
+- 6 integration files modified: `config_flow.py`, `const.py`, `strings.json`, `translations/en.json`, `translations/de.json`, `manifest.json`
+
+---
+
+## v2026.03.05.1 - Forecast Sensor Fix & Cost-Based MPC
+
+**Released:** March 5, 2026
+
+### Bug Fix
+- **Forecast sensor 16KB attribute overflow**: Removed `historical` key from `sensor.consumption_forecast` and `sensor.solar_forecast` attributes that was embedding ~11.5 KB of historical data, causing HA Recorder to reject attributes over 16 KB. The `forecast` array (96 × 15-min steps) is preserved for ApexCharts dashboard cards.
+
+### Backend Changes (deployed separately)
+- **Cost-based MPC optimizer**: Full CVXPY rewrite with grid export revenue, proper power balance equality constraints, and per-user feed-in price
+
+---
+
 ## v2026.02.06.1 - Battery Power Monitoring & SolarEdge Refinements
 
 **Released:** February 6, 2026
