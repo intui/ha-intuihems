@@ -1,5 +1,38 @@
 # intuiHEMS Release Notes
 
+## v2026.03.24.1 - Price Fetcher Fix, Default Surcharge & PV Docs
+
+**Released:** March 24, 2026
+
+### Bug Fixes
+
+#### 🔌 EPEX Price Fetcher Recovery
+The daily EPEX price fetch (13:00 CET via Tibber API) could silently fail to retrieve tomorrow's prices after an API timeout. When the 504 error recovery succeeded but Tibber hadn't published tomorrow's prices yet, the retry loop stopped prematurely without checking if tomorrow's data was actually returned.
+
+**Impact:** MPC ran with only today's remaining price steps (e.g. 30/96), padding the rest with a flat value — no price-aware optimization for the next day.
+
+**Fix:** Error recovery retry loop now calls `has_tomorrow_prices()` and continues retrying until tomorrow's data is available.
+
+#### 🔋 Retroactive Unit Normalization
+Fixed polluted sensor readings for users whose sensors report in W (not kW). Historical data ingested before v2026.03.23.1 was stored 1000× too high, causing absurd solar forecasts (e.g. 4,636 kW peak). Corrected retroactively for affected users.
+
+### Changed
+
+#### 💰 Default EPEX Surcharge → 17 ct/kWh
+The default electricity surcharge (markup on top of EPEX spot price) increased from 5 ct to **17 ct/kWh** to better reflect typical German retail pricing:
+- Backend: model default, new user config, MPC runner fallback, price API fallback
+- HA integration: config flow default (was 10 ct)
+- **Existing users with configured surcharges are not affected**
+
+### Added
+- **PV Forecasting Documentation** (`docs/PV_FORECASTING.md`) — comprehensive technical overview of hybrid physics + weather pipeline, auto-calibration, per-user data flow, and future improvement TODOs
+
+### Technical Changes
+- Backend: `epex_price_fetcher.py`, `models.py`, `auth.py`, `mpc_runner.py`, `ha_integration.py`
+- HA: `const.py` (`DEFAULT_EPEX_MARKUP` 0.10 → 0.17), `manifest.json`
+
+---
+
 ## v2026.03.23.1 - Configurable Location & Tibber Resilience
 
 **Released:** March 23, 2026
