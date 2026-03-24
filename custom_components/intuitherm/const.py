@@ -98,7 +98,7 @@ DEFAULT_UPDATE_INTERVAL: Final = 900  # seconds (15 minutes)
 DEFAULT_BATTERY_CAPACITY: Final = 10.0  # kWh
 DEFAULT_BATTERY_MAX_POWER: Final = 3.0  # kW
 DEFAULT_BATTERY_CHARGE_MAX_POWER: Final = 3.0  # kW
-DEFAULT_EPEX_MARKUP: Final = 0.10  # €0.10/kWh markup
+DEFAULT_EPEX_MARKUP: Final = 0.17  # €0.17/kWh markup
 DEFAULT_GRID_EXPORT_PRICE: Final = 0.08  # €0.08/kWh feed-in tariff
 
 # Service endpoints

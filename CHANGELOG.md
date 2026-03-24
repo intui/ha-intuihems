@@ -5,6 +5,37 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.03.24.1] - 2026-03-24
+
+### Fixed
+- **EPEX Price Fetcher Recovery**
+  - Error recovery retry loop now checks `has_tomorrow_prices()` before stopping
+  - Previously, a successful API call after a timeout was treated as "recovered" even if tomorrow's prices were missing
+  - Prevents 24h price gaps when Tibber API times out at 13:00 CET
+- **Retroactive Unit Normalization**
+  - Fixed polluted sensor readings for users with W-reporting sensors (stored 1000× too high)
+  - Corrected historical data for affected users to enable proper solar calibration
+
+### Changed
+- **Default EPEX Surcharge: 17 ct/kWh**
+  - Backend default increased from 5 ct to 17 ct/kWh (models, auth, MPC runner, price API)
+  - HA integration config flow default increased from 10 ct to 17 ct/kWh
+  - Reflects typical German retail electricity pricing more accurately
+  - Existing users with configured surcharges are not affected
+
+### Added
+- **PV Forecasting Documentation** (`docs/PV_FORECASTING.md`)
+  - Comprehensive technical overview of hybrid physics + weather forecast pipeline
+  - Per-user auto-calibration process and data requirements
+  - Future improvement TODOs: POA irradiance, multi-string, auto-detect orientation
+- **Animation Output Path**
+  - `animate_forecast.py` now defaults to `visualizations/` directory with auto-mkdir
+
+### Technical Details
+- Backend files: `epex_price_fetcher.py`, `models.py`, `auth.py`, `mpc_runner.py`, `ha_integration.py`
+- HA files: `const.py`, `manifest.json`
+- New file: `docs/PV_FORECASTING.md`
+
 ## [2026.03.23.1] - 2026-03-23
 
 ### Added
