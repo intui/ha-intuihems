@@ -876,12 +876,38 @@ class IntuiThermSavingsTodaySensor(IntuiThermSensorBase):
         if not savings or isinstance(savings, Exception):
             return {}
 
+        pv_eur = savings.get("pv_savings_eur", 0) or 0
+        arb_eur = savings.get("arbitrage_savings_eur", 0) or 0
+        solar_kwh = savings.get("solar_kwh_in_battery", 0) or 0
+        grid_kwh = savings.get("grid_kwh_in_battery", 0) or 0
+        avg_grid_cost = savings.get("avg_grid_cost_eur_kwh")
+        pool_total = solar_kwh + grid_kwh
+        solar_pct = round(100 * solar_kwh / pool_total) if pool_total > 0.01 else 0
+        grid_pct = 100 - solar_pct if pool_total > 0.01 else 0
+
         return {
-            "pv_savings_eur": savings.get("pv_savings_eur", 0),
-            "arbitrage_savings_eur": savings.get("arbitrage_savings_eur", 0),
-            "solar_kwh_in_battery": savings.get("solar_kwh_in_battery", 0),
-            "grid_kwh_in_battery": savings.get("grid_kwh_in_battery", 0),
-            "avg_grid_cost_eur_kwh": savings.get("avg_grid_cost_eur_kwh"),
+            "description": (
+                "Estimated total battery savings today: solar energy buffered in the battery "
+                "(PV savings) plus grid energy bought cheap and used at higher prices "
+                "(arbitrage savings). Only covers energy flowing through the battery — "
+                "direct solar-to-load is not included."
+            ),
+            "pv_savings_eur": round(pv_eur, 4),
+            "arbitrage_savings_eur": round(arb_eur, 4),
+            "pv_savings_note": (
+                f"Solar pool: {round(solar_kwh, 3)} kWh ({solar_pct}% of battery). "
+                "Savings = solar_fraction × discharge_kWh × (spot_price − feed_in_price)."
+            ),
+            "arbitrage_savings_note": (
+                f"Grid pool: {round(grid_kwh, 3)} kWh ({grid_pct}% of battery)"
+                + (f" charged at avg {round(avg_grid_cost, 3)} €/kWh. " if avg_grid_cost else ". ")
+                + "Savings = grid_fraction × discharge_kWh × (spot_price − avg_charge_cost)."
+            ),
+            "battery_solar_kwh": round(solar_kwh, 3),
+            "battery_grid_kwh": round(grid_kwh, 3),
+            "battery_solar_pct": solar_pct,
+            "battery_grid_pct": grid_pct,
+            "avg_grid_cost_eur_kwh": round(avg_grid_cost, 4) if avg_grid_cost else None,
             "savings_date": savings.get("savings_date"),
             "updated_at": savings.get("updated_at"),
         }
@@ -914,6 +940,35 @@ class IntuiThermPVSavingsTodaySensor(IntuiThermSensorBase):
 
         return savings.get("pv_savings_eur")
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return PV savings explanation and pool state."""
+        if not self.coordinator.data:
+            return {}
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return {}
+
+        solar_kwh = savings.get("solar_kwh_in_battery", 0) or 0
+        grid_kwh = savings.get("grid_kwh_in_battery", 0) or 0
+        pool_total = solar_kwh + grid_kwh
+        solar_pct = round(100 * solar_kwh / pool_total) if pool_total > 0.01 else 0
+
+        return {
+            "description": (
+                "Savings from solar energy that was stored in the battery and later "
+                "discharged to the house. Calculated as: solar_fraction × discharge_kWh × "
+                "(spot_price − feed_in_price). The feed-in price is subtracted because "
+                "exporting that solar would have earned revenue — using it avoids import "
+                "but forgoes export. Does not include direct solar-to-load (no battery)."
+            ),
+            "solar_kwh_in_battery": round(solar_kwh, 3),
+            "solar_pct_of_battery": solar_pct,
+            "savings_date": savings.get("savings_date"),
+            "updated_at": savings.get("updated_at"),
+        }
+
 
 class IntuiThermArbitrageSavingsTodaySensor(IntuiThermSensorBase):
     """Sensor showing savings from smart charging timing (buy cheap, use at peak)."""
@@ -941,3 +996,33 @@ class IntuiThermArbitrageSavingsTodaySensor(IntuiThermSensorBase):
             return None
 
         return savings.get("arbitrage_savings_eur")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return arbitrage savings explanation and pool state."""
+        if not self.coordinator.data:
+            return {}
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return {}
+
+        solar_kwh = savings.get("solar_kwh_in_battery", 0) or 0
+        grid_kwh = savings.get("grid_kwh_in_battery", 0) or 0
+        avg_grid_cost = savings.get("avg_grid_cost_eur_kwh")
+        pool_total = solar_kwh + grid_kwh
+        grid_pct = round(100 * grid_kwh / pool_total) if pool_total > 0.01 else 0
+
+        return {
+            "description": (
+                "Savings from grid energy that was force-charged into the battery at a "
+                "lower spot price and later discharged when prices are higher. "
+                "Calculated as: grid_fraction × discharge_kWh × (current_spot_price − avg_charge_cost). "
+                "Negative spreads (charged expensive, using cheap) are clamped to zero."
+            ),
+            "grid_kwh_in_battery": round(grid_kwh, 3),
+            "grid_pct_of_battery": grid_pct,
+            "avg_grid_charge_cost_eur_kwh": round(avg_grid_cost, 4) if avg_grid_cost else None,
+            "savings_date": savings.get("savings_date"),
+            "updated_at": savings.get("updated_at"),
+        }
