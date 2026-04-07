@@ -80,6 +80,9 @@ class BatteryControlExecutor:
         # State sensors for feedback
         self.battery_soc_sensor = detected_entities.get(CONF_BATTERY_SOC_ENTITY, "sensor.battery_soc_2")
         self.battery_power_sensor = detected_entities.get(CONF_BATTERY_POWER_ENTITY, "sensor.battery_power")
+        # Fallback: separate charge/discharge sensors (e.g. FoxESS which has no net power sensor)
+        self.battery_charge_sensor = detected_entities.get("battery_charge_sensor", "sensor.battery_charge")
+        self.battery_discharge_sensor = detected_entities.get("battery_discharge_sensor", "sensor.battery_discharge")
         
         # Max battery power in kW (for SolarEdge backup/peak shaving)
         self.battery_max_power = config.get(CONF_BATTERY_MAX_POWER, 3.0)
@@ -771,14 +774,33 @@ class BatteryControlExecutor:
                 except ValueError:
                     pass
             
-            # Try to read battery power sensor
+            # Try to read battery power sensor (net kW)
             power_sensor = self.hass.states.get(self.battery_power_sensor)
             if power_sensor and power_sensor.state not in ["unknown", "unavailable"]:
                 try:
                     actual_power = float(power_sensor.state) / 1000.0  # Convert W to kW
                 except ValueError:
                     pass
-            
+
+            # Fallback: derive net power from separate charge/discharge sensors
+            # (e.g. FoxESS exposes sensor.battery_charge and sensor.battery_discharge in kW)
+            if actual_power is None:
+                try:
+                    charge_state = self.hass.states.get(self.battery_charge_sensor)
+                    discharge_state = self.hass.states.get(self.battery_discharge_sensor)
+                    if (charge_state and charge_state.state not in ["unknown", "unavailable"]
+                            and discharge_state and discharge_state.state not in ["unknown", "unavailable"]):
+                        charge_kw = float(charge_state.state)  # already kW
+                        discharge_kw = float(discharge_state.state)  # already kW
+                        # Net: positive = charging, negative = discharging
+                        actual_power = charge_kw - discharge_kw
+                        _LOGGER.debug(
+                            f"Derived actual_power={actual_power:.3f} kW from "
+                            f"charge={charge_kw:.3f} kW, discharge={discharge_kw:.3f} kW"
+                        )
+                except (ValueError, AttributeError):
+                    pass
+
             # Send feedback to backend
             feedback_data = {
                 "target_timestamp": target_timestamp,
