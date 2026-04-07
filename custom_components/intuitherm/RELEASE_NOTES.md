@@ -1,5 +1,45 @@
 # intuiHEMS Release Notes
 
+## v2026.04.07.1 - Battery Savings Tracking
+
+**Released:** April 7, 2026
+
+### What's New
+
+#### 💰 Battery Savings Tracking
+intuiHEMS now tracks how much money your battery saves you — broken down by source.
+
+Three new sensors appear in Home Assistant:
+
+| Sensor | What it measures |
+|--------|-----------------|
+| `sensor.savings_today` | Total estimated savings today (EUR) |
+| `sensor.pv_savings_today` | Savings from using stored solar instead of buying grid |
+| `sensor.arbitrage_savings_today` | Savings from buying cheap at night, using at peak hours |
+
+**How it works:** The system maintains a two-pool cost-basis model inside the battery. Solar energy enters the battery at feed-in price (opportunity cost), grid energy at the actual spot price paid. When the battery discharges, the system compares the pool cost to the current grid price and computes the savings proportionally.
+
+**Example:** Your battery holds 5 kWh of solar (free) and 3 kWh of grid energy (bought at 9 ct/kWh). When it discharges 2 kWh during a 32 ct/kWh peak, ~63% comes from the solar pool (saving 24 ct/kWh vs grid) and ~37% from the grid pool (saving 23 ct/kWh arbitrage).
+
+The main `sensor.savings_today` also exposes battery pool state as attributes:
+- `solar_kwh_in_battery` / `grid_kwh_in_battery` — current energy split
+- `avg_grid_cost_eur_kwh` — weighted-average cost of grid energy in battery
+
+Savings reset automatically at midnight.
+
+### Backend Changes (deployed separately)
+- New database tables for cost-basis tracking and interval-level savings history
+- `GET /api/v1/savings/today` and `GET /api/v1/savings/period?days=7` endpoints
+- Savings computed automatically from execution feedback every 15 minutes
+
+### Upgrade Instructions
+1. Update via HACS or manually copy `custom_components/intuitherm/` to your HA config
+2. Restart Home Assistant
+3. The three new sensors will appear automatically — no reconfiguration needed
+4. Savings will start accumulating from the next battery discharge cycle
+
+---
+
 ## v2026.03.24.1 - Price Fetcher Fix, Default Surcharge & PV Docs
 
 **Released:** March 24, 2026

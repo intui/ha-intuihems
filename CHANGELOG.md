@@ -5,6 +5,31 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.04.07.1] - 2026-04-07
+
+### Added
+- **Battery Savings Tracking (Two-Pool Cost-Basis Model)**
+  - Tracks solar vs grid energy in the battery as two separate pools
+  - On discharge, computes PV savings and arbitrage savings separately
+  - PV savings: value of using free solar energy instead of buying from grid
+  - Arbitrage savings: value of buying cheap grid energy and using it during expensive hours
+  - Three new HA sensors: `sensor.savings_today`, `sensor.pv_savings_today`, `sensor.arbitrage_savings_today`
+  - Battery pool state exposed as sensor attributes (solar/grid kWh split, avg grid cost)
+  - Daily savings reset at midnight UTC
+  - Coordinator fetches savings data alongside existing endpoints
+
+### Backend (Cloud Service — deployed 2026-04-07)
+- New `energy_savings_state` table: per-user cost-basis pools and daily savings accumulators
+- New `energy_savings_log` table: per-interval savings history for weekly/monthly roll-ups
+- Savings tracker service integrated into execution feedback handler
+- API endpoints: `GET /api/v1/savings/today`, `GET /api/v1/savings/period?days=7`
+- Alembic migration 009
+
+### Technical Details
+- HA files: `const.py` (+3 sensor types), `coordinator.py` (savings fetch), `sensor.py` (+3 sensor classes), `manifest.json` (version bump)
+- Backend new: `app/services/savings_tracker.py`, `app/api/savings.py`, `alembic/versions/009_add_savings_tables.py`
+- Backend modified: `app/database/models.py` (+2 models), `app/api/control_plan.py` (hook savings), `app/main.py` (register router)
+
 ## [2026.03.24.1] - 2026-03-24
 
 ### Fixed
