@@ -5,6 +5,26 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.04.07.2] - 2026-04-07
+
+### Added
+- **Rich Savings Sensor Tooltips**
+  - All three savings sensors (`savings_today`, `pv_savings_today`, `arbitrage_savings_today`) now expose a human-readable `description` attribute visible in the HA entity detail panel
+  - `sensor.savings_today`: description + dynamic `pv_savings_note` and `arbitrage_savings_note` showing live pool state (kWh, %, avg grid cost in text form)
+  - `sensor.pv_savings_today`: explains the formula `solar_fraction × discharge_kWh × (spot_price − feed_in_price)`, the feed-in opportunity-cost rationale, and the limitation that direct solar-to-load is not included
+  - `sensor.battery_arbitrage_savings_today`: explains buy-cheap-use-expensive logic and that negative spreads are clamped to zero
+
+### Fixed
+- **Savings Not Accumulating (actual_power Always None)**
+  - Root cause: FoxESS inverters expose `sensor.battery_charge` and `sensor.battery_discharge` separately (kW) with no combined net power sensor
+  - `battery_control.py` was falling back to `sensor.battery_power` which does not exist on FoxESS → `actual_power=None` on every feedback call → savings tracker skipped all charge/discharge accounting
+  - Fix: when the net power sensor is unavailable/unknown, derive `actual_power = charge_kW − discharge_kW` (positive = charging, negative = discharging)
+  - Fix: removed premature early return in `savings_tracker.py` on `actual_power=None` — savings state and SOC recalibration now always run
+
+### Technical Details
+- HA files: `battery_control.py` (charge/discharge fallback), `sensor.py` (tooltip attributes), `manifest.json`
+- Backend files: `app/services/savings_tracker.py` (removed early return)
+
 ## [2026.04.07.1] - 2026-04-07
 
 ### Added

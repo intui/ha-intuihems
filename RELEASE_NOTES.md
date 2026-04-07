@@ -1,5 +1,49 @@
 # intuiHEMS Release Notes
 
+## v2026.04.07.2 - Savings Fix & Sensor Tooltips
+
+**Released:** April 7, 2026
+
+### Bug Fixes
+
+#### 🔋 Savings Not Accumulating on FoxESS Inverters
+The three savings sensors introduced in v2026.04.07.1 were always showing 0.00 EUR due to a device compatibility issue.
+
+**Root cause:** FoxESS inverters expose battery charge and discharge as two separate sensors (`sensor.battery_charge` and `sensor.battery_discharge`, both in kW) rather than a combined net power sensor. The integration was trying to read `sensor.battery_power`, which doesn't exist on FoxESS, so `actual_power` was always `None` — causing the savings tracker to skip all charge/discharge accounting.
+
+**Fix:** When the net power sensor is unavailable, net battery power is now derived automatically as:
+
+```
+actual_power = battery_charge_kW − battery_discharge_kW
+```
+
+Positive = charging, negative = discharging. No configuration change needed.
+
+**Additional fix:** The savings state and SOC recalibration now always run even when power readings are unavailable (previously the tracker bailed out early).
+
+### What's New
+
+#### 🔍 Savings Sensor Tooltips
+All three savings sensors now show detailed explanations in the Home Assistant entity detail panel (click the sensor → attributes):
+
+| Sensor | Tooltip content |
+|--------|----------------|
+| `sensor.savings_today` | Description + live pool notes: current kWh split, % shares, avg grid cost |
+| `sensor.pv_savings_today` | Formula explanation + feed-in opportunity-cost rationale + battery-only limitation |
+| `sensor.arbitrage_savings_today` | Buy-cheap-use-expensive explanation + clamp-to-zero note |
+
+**Example attribute on `sensor.pv_savings_today`:**
+> *"Savings from solar energy that was stored in the battery and later discharged to the house. Calculated as: solar_fraction × discharge_kWh × (spot_price − feed_in_price). The feed-in price is subtracted because exporting that solar would have earned revenue — using it avoids import but forgoes export. Does not include direct solar-to-load (no battery)."*
+
+**Note on scope:** Savings only cover energy that flows **through the battery**. Direct solar-to-load (PV → house, bypassing the battery) is not counted.
+
+### Upgrade Instructions
+1. Update via HACS or manually copy `custom_components/intuitherm/` to your HA config
+2. Restart Home Assistant
+3. Savings will start accumulating from the next 15-min execution cycle — no reconfiguration needed
+
+---
+
 ## v2026.04.07.1 - Battery Savings Tracking
 
 **Released:** April 7, 2026

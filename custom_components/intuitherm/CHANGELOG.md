@@ -5,6 +5,22 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.04.07.2] - 2026-04-07
+
+### Added
+- **Savings Sensor Tooltip Descriptions**
+  - All three savings sensors now expose a `description` attribute explaining the formula and limitations
+  - `sensor.savings_today`: description + live pool breakdown notes showing current kWh, % split, and avg grid cost
+  - `sensor.pv_savings_today`: explains feed-in price subtraction and battery-only limitation (direct solar-to-load not counted)
+  - `sensor.arbitrage_savings_today`: explains buy-cheap-use-expensive logic and that negative spreads are clamped to zero
+
+### Fixed
+- **Savings Not Accumulating — actual_power Always None**
+  - FoxESS inverters expose separate `sensor.battery_charge` and `sensor.battery_discharge` sensors (kW) but no combined net power sensor
+  - `battery_control.py` was reading `sensor.battery_power` (unavailable on FoxESS), resulting in `actual_power=None` on every feedback call
+  - Fix: derive net power as `charge_kW − discharge_kW` when the net sensor is unavailable (positive = charging, negative = discharging)
+  - Fix: savings state is always created and SOC recalibration always runs even when power reading is missing (removed premature early return)
+
 ## [2026.04.07.1] - 2026-04-07
 
 ### Added
