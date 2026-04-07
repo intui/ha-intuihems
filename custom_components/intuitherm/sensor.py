@@ -25,6 +25,9 @@ from .const import (
     SENSOR_TYPE_MPC_SUCCESS_RATE,
     SENSOR_TYPE_MPC_SOLVE_TIME,
     SENSOR_TYPE_DRY_RUN_MODE,
+    SENSOR_TYPE_SAVINGS_TODAY,
+    SENSOR_TYPE_PV_SAVINGS_TODAY,
+    SENSOR_TYPE_ARBITRAGE_SAVINGS_TODAY,
     CONF_DETECTED_ENTITIES,
     CONF_DRY_RUN_MODE,
     ATTR_MODE,
@@ -62,6 +65,10 @@ async def async_setup_entry(
         IntuiThermSolarForecastSensor(coordinator, entry),
         IntuiThermNextControlSensor(coordinator, entry),
         IntuiThermPredictedCostSensor(coordinator, entry),
+        # Savings sensors
+        IntuiThermSavingsTodaySensor(coordinator, entry),
+        IntuiThermPVSavingsTodaySensor(coordinator, entry),
+        IntuiThermArbitrageSavingsTodaySensor(coordinator, entry),
     ]
 
     async_add_entities(sensors)
@@ -830,3 +837,107 @@ class IntuiThermPredictedCostSensor(IntuiThermSensorBase):
             "max_price": price_data.get("max_price"),
             "unit": "EUR/kWh",
         }
+
+
+class IntuiThermSavingsTodaySensor(IntuiThermSensorBase):
+    """Sensor showing total estimated savings today (PV + arbitrage)."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            SENSOR_TYPE_SAVINGS_TODAY,
+            "Savings Today",
+            "mdi:piggy-bank-outline",
+        )
+        self._attr_native_unit_of_measurement = "EUR"
+        self._attr_state_class = SensorStateClass.TOTAL
+
+    @property
+    def native_value(self) -> float | None:
+        """Return total savings today."""
+        if not self.coordinator.data:
+            return None
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return None
+
+        return savings.get("total_savings_eur")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return savings breakdown."""
+        if not self.coordinator.data:
+            return {}
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return {}
+
+        return {
+            "pv_savings_eur": savings.get("pv_savings_eur", 0),
+            "arbitrage_savings_eur": savings.get("arbitrage_savings_eur", 0),
+            "solar_kwh_in_battery": savings.get("solar_kwh_in_battery", 0),
+            "grid_kwh_in_battery": savings.get("grid_kwh_in_battery", 0),
+            "avg_grid_cost_eur_kwh": savings.get("avg_grid_cost_eur_kwh"),
+            "savings_date": savings.get("savings_date"),
+            "updated_at": savings.get("updated_at"),
+        }
+
+
+class IntuiThermPVSavingsTodaySensor(IntuiThermSensorBase):
+    """Sensor showing savings from using stored solar energy."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            SENSOR_TYPE_PV_SAVINGS_TODAY,
+            "PV Savings Today",
+            "mdi:solar-power-variant",
+        )
+        self._attr_native_unit_of_measurement = "EUR"
+        self._attr_state_class = SensorStateClass.TOTAL
+
+    @property
+    def native_value(self) -> float | None:
+        """Return PV savings today."""
+        if not self.coordinator.data:
+            return None
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return None
+
+        return savings.get("pv_savings_eur")
+
+
+class IntuiThermArbitrageSavingsTodaySensor(IntuiThermSensorBase):
+    """Sensor showing savings from smart charging timing (buy cheap, use at peak)."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            SENSOR_TYPE_ARBITRAGE_SAVINGS_TODAY,
+            "Arbitrage Savings Today",
+            "mdi:chart-timeline-variant-shimmer",
+        )
+        self._attr_native_unit_of_measurement = "EUR"
+        self._attr_state_class = SensorStateClass.TOTAL
+
+    @property
+    def native_value(self) -> float | None:
+        """Return arbitrage savings today."""
+        if not self.coordinator.data:
+            return None
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return None
+
+        return savings.get("arbitrage_savings_eur")

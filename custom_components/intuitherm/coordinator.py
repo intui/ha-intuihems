@@ -153,9 +153,10 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                     battery_soc_plan_task = self._fetch_json("/api/v1/forecasts/battery_soc")
                     control_plan_task = self._fetch_json("/api/v1/control/plan")  # Pull-based control plan
                     price_forecast_task = self._fetch_json("/api/v1/forecasts/prices")
+                    savings_task = self._fetch_json("/api/v1/savings/today")
 
                     health, status, metrics, consumption_forecast, solar_forecast, \
-                    battery_soc_plan, control_plan, price_forecast = await asyncio.gather(
+                    battery_soc_plan, control_plan, price_forecast, savings = await asyncio.gather(
                         health_task,
                         status_task,
                         metrics_task,
@@ -164,6 +165,7 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                         battery_soc_plan_task,
                         control_plan_task,
                         price_forecast_task,
+                        savings_task,
                         return_exceptions=True,
                     )
                     _LOGGER.info("✅ Backend data fetched successfully")
@@ -172,7 +174,7 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                 # Return partial data with None values for missing data
                 health = status = metrics = None
                 consumption_forecast = solar_forecast = battery_soc_plan = None
-                control_plan = price_forecast = None
+                control_plan = price_forecast = savings = None
 
             # Build response, handling individual failures gracefully
             data = {
@@ -204,6 +206,7 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             data["battery_soc_forecast"] = battery_soc_plan if not isinstance(battery_soc_plan, Exception) else None
             data["control_plan"] = control_plan if not isinstance(control_plan, Exception) else None
             data["price_forecast"] = price_forecast if not isinstance(price_forecast, Exception) else None
+            data["savings"] = savings if not isinstance(savings, Exception) else None
             
             if isinstance(consumption_forecast, Exception):
                 _LOGGER.debug("No consumption forecast available yet: %s", consumption_forecast)

@@ -132,6 +132,9 @@ SENSOR_TYPE_CONTROL_MODE: Final = "control_mode"
 SENSOR_TYPE_MPC_SUCCESS_RATE: Final = "mpc_success_rate"
 SENSOR_TYPE_MPC_SOLVE_TIME: Final = "mpc_solve_time"
 SENSOR_TYPE_DRY_RUN_MODE: Final = "dry_run_mode"
+SENSOR_TYPE_SAVINGS_TODAY: Final = "savings_today"
+SENSOR_TYPE_PV_SAVINGS_TODAY: Final = "pv_savings_today"
+SENSOR_TYPE_ARBITRAGE_SAVINGS_TODAY: Final = "arbitrage_savings_today"
 
 # Switch types
 SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"
