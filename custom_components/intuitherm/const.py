@@ -135,6 +135,7 @@ SENSOR_TYPE_DRY_RUN_MODE: Final = "dry_run_mode"
 SENSOR_TYPE_SAVINGS_TODAY: Final = "savings_today"
 SENSOR_TYPE_PV_SAVINGS_TODAY: Final = "pv_savings_today"
 SENSOR_TYPE_ARBITRAGE_SAVINGS_TODAY: Final = "arbitrage_savings_today"
+SENSOR_TYPE_CO2_AVOIDED_TODAY: Final = "co2_avoided_today"
 
 # Switch types
 SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"

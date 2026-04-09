@@ -28,6 +28,7 @@ from .const import (
     SENSOR_TYPE_SAVINGS_TODAY,
     SENSOR_TYPE_PV_SAVINGS_TODAY,
     SENSOR_TYPE_ARBITRAGE_SAVINGS_TODAY,
+    SENSOR_TYPE_CO2_AVOIDED_TODAY,
     CONF_DETECTED_ENTITIES,
     CONF_DRY_RUN_MODE,
     ATTR_MODE,
@@ -69,6 +70,7 @@ async def async_setup_entry(
         IntuiThermSavingsTodaySensor(coordinator, entry),
         IntuiThermPVSavingsTodaySensor(coordinator, entry),
         IntuiThermArbitrageSavingsTodaySensor(coordinator, entry),
+        IntuiThermCO2AvoidedTodaySensor(coordinator, entry),
     ]
 
     async_add_entities(sensors)
@@ -885,6 +887,8 @@ class IntuiThermSavingsTodaySensor(IntuiThermSensorBase):
         solar_pct = round(100 * solar_kwh / pool_total) if pool_total > 0.01 else 0
         grid_pct = 100 - solar_pct if pool_total > 0.01 else 0
 
+        co2_avoided = savings.get("co2_avoided_today_g", 0) or 0
+
         return {
             "description": (
                 "Estimated total battery savings today: solar energy buffered in the battery "
@@ -894,6 +898,7 @@ class IntuiThermSavingsTodaySensor(IntuiThermSensorBase):
             ),
             "pv_savings_eur": round(pv_eur, 4),
             "arbitrage_savings_eur": round(arb_eur, 4),
+            "co2_avoided_today_g": round(co2_avoided, 1),
             "pv_savings_note": (
                 f"Solar pool: {round(solar_kwh, 3)} kWh ({solar_pct}% of battery). "
                 "Savings = solar_fraction × discharge_kWh × (spot_price − feed_in_price)."
@@ -1023,6 +1028,61 @@ class IntuiThermArbitrageSavingsTodaySensor(IntuiThermSensorBase):
             "grid_kwh_in_battery": round(grid_kwh, 3),
             "grid_pct_of_battery": grid_pct,
             "avg_grid_charge_cost_eur_kwh": round(avg_grid_cost, 4) if avg_grid_cost else None,
+            "savings_date": savings.get("savings_date"),
+            "updated_at": savings.get("updated_at"),
+        }
+
+
+class IntuiThermCO2AvoidedTodaySensor(IntuiThermSensorBase):
+    """Sensor showing CO2 emissions avoided by using battery instead of grid."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        """Initialize the sensor."""
+        super().__init__(
+            coordinator,
+            entry,
+            SENSOR_TYPE_CO2_AVOIDED_TODAY,
+            "CO2 Avoided Today",
+            "mdi:molecule-co2",
+        )
+        self._attr_native_unit_of_measurement = "g"
+        self._attr_state_class = SensorStateClass.TOTAL
+
+    @property
+    def native_value(self) -> float | None:
+        """Return CO2 avoided today in grams."""
+        if not self.coordinator.data:
+            return None
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return None
+
+        return savings.get("co2_avoided_today_g")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return CO2 savings explanation."""
+        if not self.coordinator.data:
+            return {}
+
+        savings = self.coordinator.data.get("savings")
+        if not savings or isinstance(savings, Exception):
+            return {}
+
+        co2_g = savings.get("co2_avoided_today_g", 0) or 0
+        co2_kg = co2_g / 1000
+
+        return {
+            "description": (
+                "CO₂ emissions avoided today by discharging the battery to serve house "
+                "load instead of importing from the grid. Calculated as: "
+                "discharge_kWh × grid_co2_intensity (gCO₂/kWh). "
+                "CO₂ intensity is computed from the German generation mix "
+                "(Energy Charts / Fraunhofer ISE) using standard emission factors."
+            ),
+            "co2_avoided_kg": round(co2_kg, 3),
+            "co2_avoided_g": round(co2_g, 1),
             "savings_date": savings.get("savings_date"),
             "updated_at": savings.get("updated_at"),
         }
