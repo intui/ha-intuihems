@@ -29,6 +29,10 @@ from .const import (
     SENSOR_TYPE_PV_SAVINGS_TODAY,
     SENSOR_TYPE_ARBITRAGE_SAVINGS_TODAY,
     SENSOR_TYPE_CO2_AVOIDED_TODAY,
+    SENSOR_TYPE_OVERALL_SAVINGS,
+    SENSOR_TYPE_OVERALL_PV_SAVINGS,
+    SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS,
+    SENSOR_TYPE_OVERALL_CO2_AVOIDED,
     CONF_DETECTED_ENTITIES,
     CONF_DRY_RUN_MODE,
     ATTR_MODE,
@@ -71,6 +75,11 @@ async def async_setup_entry(
         IntuiThermPVSavingsTodaySensor(coordinator, entry),
         IntuiThermArbitrageSavingsTodaySensor(coordinator, entry),
         IntuiThermCO2AvoidedTodaySensor(coordinator, entry),
+        # Overall savings sensors
+        IntuiThermOverallSavingsSensor(coordinator, entry),
+        IntuiThermOverallPVSavingsSensor(coordinator, entry),
+        IntuiThermOverallArbitrageSavingsSensor(coordinator, entry),
+        IntuiThermOverallCO2AvoidedSensor(coordinator, entry),
     ]
 
     async_add_entities(sensors)
@@ -1085,4 +1094,125 @@ class IntuiThermCO2AvoidedTodaySensor(IntuiThermSensorBase):
             "co2_avoided_g": round(co2_g, 1),
             "savings_date": savings.get("savings_date"),
             "updated_at": savings.get("updated_at"),
+        }
+
+
+class IntuiThermOverallSavingsSensor(IntuiThermSensorBase):
+    """Sensor showing all-time total savings (PV + arbitrage)."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(
+            coordinator, entry,
+            SENSOR_TYPE_OVERALL_SAVINGS,
+            "Overall Savings",
+            "mdi:piggy-bank",
+        )
+        self._attr_native_unit_of_measurement = "EUR"
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def native_value(self) -> float | None:
+        if not self.coordinator.data:
+            return None
+        overall = self.coordinator.data.get("savings_overall")
+        if not overall or isinstance(overall, Exception):
+            return None
+        return overall.get("total_savings_eur")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self.coordinator.data:
+            return {}
+        overall = self.coordinator.data.get("savings_overall")
+        if not overall or isinstance(overall, Exception):
+            return {}
+        return {
+            "pv_savings_eur": overall.get("pv_savings_eur"),
+            "arbitrage_savings_eur": overall.get("arbitrage_savings_eur"),
+            "co2_avoided_kg": overall.get("co2_avoided_kg"),
+            "intervals_counted": overall.get("intervals_counted"),
+            "first_record": overall.get("first_record"),
+        }
+
+
+class IntuiThermOverallPVSavingsSensor(IntuiThermSensorBase):
+    """Sensor showing all-time PV savings."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(
+            coordinator, entry,
+            SENSOR_TYPE_OVERALL_PV_SAVINGS,
+            "Overall PV Savings",
+            "mdi:solar-power-variant",
+        )
+        self._attr_native_unit_of_measurement = "EUR"
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def native_value(self) -> float | None:
+        if not self.coordinator.data:
+            return None
+        overall = self.coordinator.data.get("savings_overall")
+        if not overall or isinstance(overall, Exception):
+            return None
+        return overall.get("pv_savings_eur")
+
+
+class IntuiThermOverallArbitrageSavingsSensor(IntuiThermSensorBase):
+    """Sensor showing all-time arbitrage savings."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(
+            coordinator, entry,
+            SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS,
+            "Overall Arbitrage Savings",
+            "mdi:chart-timeline-variant-shimmer",
+        )
+        self._attr_native_unit_of_measurement = "EUR"
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def native_value(self) -> float | None:
+        if not self.coordinator.data:
+            return None
+        overall = self.coordinator.data.get("savings_overall")
+        if not overall or isinstance(overall, Exception):
+            return None
+        return overall.get("arbitrage_savings_eur")
+
+
+class IntuiThermOverallCO2AvoidedSensor(IntuiThermSensorBase):
+    """Sensor showing all-time CO2 emissions avoided."""
+
+    def __init__(self, coordinator: IntuiThermCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(
+            coordinator, entry,
+            SENSOR_TYPE_OVERALL_CO2_AVOIDED,
+            "Overall CO2 Avoided",
+            "mdi:molecule-co2",
+        )
+        self._attr_native_unit_of_measurement = "kg"
+        self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    @property
+    def native_value(self) -> float | None:
+        if not self.coordinator.data:
+            return None
+        overall = self.coordinator.data.get("savings_overall")
+        if not overall or isinstance(overall, Exception):
+            return None
+        return overall.get("co2_avoided_kg")
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if not self.coordinator.data:
+            return {}
+        overall = self.coordinator.data.get("savings_overall")
+        if not overall or isinstance(overall, Exception):
+            return {}
+        co2_g = overall.get("co2_avoided_g", 0) or 0
+        return {
+            "co2_avoided_g": round(co2_g, 1),
+            "co2_avoided_kg": overall.get("co2_avoided_kg"),
+            "first_record": overall.get("first_record"),
         }

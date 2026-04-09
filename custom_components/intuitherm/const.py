@@ -136,6 +136,10 @@ SENSOR_TYPE_SAVINGS_TODAY: Final = "savings_today"
 SENSOR_TYPE_PV_SAVINGS_TODAY: Final = "pv_savings_today"
 SENSOR_TYPE_ARBITRAGE_SAVINGS_TODAY: Final = "arbitrage_savings_today"
 SENSOR_TYPE_CO2_AVOIDED_TODAY: Final = "co2_avoided_today"
+SENSOR_TYPE_OVERALL_SAVINGS: Final = "overall_savings"
+SENSOR_TYPE_OVERALL_PV_SAVINGS: Final = "overall_pv_savings"
+SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS: Final = "overall_arbitrage_savings"
+SENSOR_TYPE_OVERALL_CO2_AVOIDED: Final = "overall_co2_avoided"
 
 # Switch types
 SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"
