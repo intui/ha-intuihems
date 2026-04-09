@@ -505,7 +505,14 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             self._detected_entities["device_id"] = control_entities[
                                 "device_id"
                             ]
-                    
+
+                        #Optional SolarEdge command mode select
+                        if control_entities.get(CONF_SOLAREDGE_COMMAND_MODE):
+                            self._detected_entities[CONF_SOLAREDGE_COMMAND_MODE] = control_entities[
+                                CONF_SOLAREDGE_COMMAND_MODE
+                            ]
+                            _LOGGER.info("  Found SolarEdge command mode select: %s", self._detected_entities[CONF_SOLAREDGE_COMMAND_MODE])
+
                     # Log what we found on this device
                     _LOGGER.info("  Found on device:")
                     if sensors.get("all_pv_sensors"):
@@ -2069,6 +2076,10 @@ class IntuiThermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._detected_entities[CONF_BATTERY_DISCHARGE_POWER] = learned_patterns[
                     CONF_BATTERY_DISCHARGE_POWER
                 ]
+            if learned_patterns.get(CONF_SOLAREDGE_COMMAND_MODE):
+                self._detected_entities[CONF_SOLAREDGE_COMMAND_MODE] = learned_patterns[
+                    CONF_SOLAREDGE_COMMAND_MODE
+                ]
 
     async def _get_all_energy_sensors(self) -> dict[str, list[dict[str, Any]]]:
         """Extract ALL sensors from Energy Dashboard with availability status.
@@ -2275,6 +2286,10 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                     detected_entities[CONF_MODE_BACKUP] = user_input[CONF_MODE_BACKUP]
                 if user_input.get(CONF_MODE_FORCE_CHARGE):
                     detected_entities[CONF_MODE_FORCE_CHARGE] = user_input[CONF_MODE_FORCE_CHARGE]
+
+                # Update solaredge command mode
+                if user_input.get(CONF_SOLAREDGE_COMMAND_MODE):
+                    detected_entities[CONF_SOLAREDGE_COMMAND_MODE] = user_input[CONF_SOLAREDGE_COMMAND_MODE]
                 
                 # Build options dict with updated sensors and battery specs
                 # Note: Service URL and API key are preserved from original config (not user-editable)
@@ -2534,7 +2549,19 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 custom_value=True,
             )
         )
-        
+
+        #add solar edge command mode
+        schema[vol.Optional(
+            CONF_SOLAREDGE_COMMAND_MODE,
+            default= detected_entities.get(CONF_SOLAREDGE_COMMAND_MODE, "") or "",
+            description="Select the SolarEdge command mode"
+        )] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=all_select_entities if all_select_entities else [],
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                custom_value=True,
+            )
+        )
         # Add mode mapping fields if battery mode select entity is configured
         mode_select_entity = detected_entities.get(CONF_BATTERY_MODE_SELECT)
         if mode_select_entity:
@@ -2569,7 +2596,7 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                     if "force" in option_lower and "charge" in option_lower:
                         current_force_charge = option
                         break
-            
+
             # Add mode mapping fields
             if available_options:
                 schema[vol.Required(
