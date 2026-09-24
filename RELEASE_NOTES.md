@@ -1,5 +1,27 @@
 # intuiHEMS Release Notes
 
+## v2026.09.24.2 - User ID Display Fix + Version Info
+
+**Released:** September 24, 2026
+
+### Bug Fixes
+
+#### 🆔 "Your User ID: unknown" in Settings
+The integration's options screen ("Configure IntuiTherm Options") always showed your User ID as `unknown` instead of your actual assigned ID, because it was looking in the wrong place internally. Your User ID was never actually lost — it's fixed now and displays correctly.
+
+### What's New
+
+#### 📦 Installed Version Shown in Settings
+The options screen now shows your currently installed version right below your User ID, so you can quickly confirm whether an update actually took effect after using HACS or restarting Home Assistant.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. No reconfiguration required
+
+---
+
 ## v2026.09.24.1 - Demo Mode Persistence Fix
 
 **Released:** September 24, 2026

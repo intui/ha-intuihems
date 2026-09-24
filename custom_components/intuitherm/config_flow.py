@@ -2242,6 +2242,8 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
         """Manage the options."""
+        from .const import VERSION
+
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -2633,7 +2635,12 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(schema),
             errors=errors,
             description_placeholders={
-                "user_id": current_config.get(CONF_USER_ID, "unknown"),
+                # CONF_USER_ID is stored nested inside CONF_DETECTED_ENTITIES
+                # (see async_create_entry in the setup wizard), never as a
+                # top-level key - reading it off current_config directly
+                # always missed and fell back to "unknown".
+                "user_id": detected_entities.get(CONF_USER_ID, "unknown"),
+                "version": VERSION,
             },
         )
     

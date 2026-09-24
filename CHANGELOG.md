@@ -5,6 +5,20 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.09.24.2] - 2026-09-24
+
+### Fixed
+- **Options Flow Showed "Your User ID: unknown"**
+  - Root cause: `CONF_USER_ID` is stored nested inside `entry.data[CONF_DETECTED_ENTITIES]` (set alongside the sensor/device mappings when the config entry is created via the setup wizard), never as a top-level key
+  - The options flow's "Your User ID" display read it off the flat `current_config = {**entry.data, **entry.options}` dict, which never has a top-level `CONF_USER_ID`, so it always fell back to `"unknown"`
+  - Fix: read from the already-available `detected_entities` dict instead
+
+### Added
+- **Installed Version** shown in the options flow, below the user ID, sourced from `const.VERSION` (read from `manifest.json`) — makes it obvious at a glance whether an update actually landed on a given HA instance
+
+### Technical Details
+- HA files: `config_flow.py`, `strings.json`, `translations/en.json`, `translations/de.json`, `manifest.json`
+
 ## [2026.09.24.1] - 2026-09-24
 
 ### Fixed
