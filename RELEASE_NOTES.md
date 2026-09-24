@@ -1,5 +1,32 @@
 # intuiHEMS Release Notes
 
+## v2026.09.24.1 - Demo Mode Persistence Fix
+
+**Released:** September 24, 2026
+
+### Bug Fixes
+
+#### 🔌 Demo Mode Switch Reverting After HA Restart
+`switch.demo_mode` would silently revert to its last-saved state every time Home Assistant restarted, even though toggling it in the UI appeared to work immediately.
+
+**Root cause:** the switch pulled its `detected_entities` config out of the config entry without copying it, then mutated that same dictionary in place before asking Home Assistant to save the updated options. Home Assistant only writes config entry changes to disk when it detects the new options differ from the old ones — but because the dictionary had already been changed in place, old and new looked identical, so HA skipped the save. The UI kept showing the new state (it reads live from that same dictionary), but nothing was ever written to storage.
+
+**Fix:** the switch now builds a fresh copy of its config before modifying it, so Home Assistant correctly detects the change and persists it. No configuration change needed — the fix takes effect after updating.
+
+### What's New
+
+#### Master Switch Removed
+The old master on/off switch (`switch.intuitherm_master_switch`) has been removed. **Demo Mode** (`switch.demo_mode`) is now the primary control exposed in Home Assistant — toggle it on to let the MPC keep running and calculating without sending commands to your battery. Automatic control status is still visible (read-only) via `sensor.optimization_status`.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. If your dashboard referenced `switch.intuitherm_master_switch`, replace it with `switch.demo_mode` (see updated dashboard examples in the repo docs)
+4. No reconfiguration required otherwise
+
+---
+
 ## v2026.04.07.2 - Savings Fix & Sensor Tooltips
 
 **Released:** April 7, 2026

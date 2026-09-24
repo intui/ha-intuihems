@@ -5,6 +5,24 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.09.24.1] - 2026-09-24
+
+### Fixed
+- **Demo Mode Switch Not Persisting Across HA Restarts**
+  - Root cause: `IntuiThermDemoModeSwitch.async_turn_on`/`async_turn_off` read `detected_entities` out of the merged `entry.data`/`entry.options` config without copying it, then mutated that dict in place before calling `hass.config_entries.async_update_entry()`
+  - Since the mutated dict was the same object already referenced by `entry.options`, HA's old-vs-new equality check inside `async_update_entry()` saw no difference between old and new options, so it never scheduled a write to `.storage/core.config_entries`
+  - The toggle appeared to work immediately (the UI reads live from the same mutated dict) but reverted to its last saved value on every HA restart
+  - Fix: build a fresh copy of `detected_entities` before mutating it, so the options dict passed to `async_update_entry()` is genuinely distinct and gets persisted
+
+### Changed
+- **Removed Master Switch** (`switch.intuitherm_master_switch`)
+  - Demo Mode is now the primary user-facing toggle from Home Assistant
+  - Automatic control status remains visible read-only via `sensor.optimization_status`
+  - Updated dashboard examples (`docs/DASHBOARD_FULL_FORECAST.yaml`, `docs/DASHBOARD_MINIMALISTIC_CARD.yaml`) accordingly
+
+### Technical Details
+- HA files: `switch.py` (bug fix + Master Switch removal), `const.py` (removed `SWITCH_TYPE_AUTO_CONTROL`), `manifest.json`
+
 ## [2026.04.07.2] - 2026-04-07
 
 ### Added

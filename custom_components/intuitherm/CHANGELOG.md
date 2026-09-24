@@ -5,6 +5,20 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.09.24.1] - 2026-09-24
+
+### Fixed
+- **Demo Mode Switch Not Persisting Across HA Restarts**
+  - `IntuiThermDemoModeSwitch` pulled `detected_entities` out of the merged config without copying it, then mutated that dict in place before calling `async_update_entry()`
+  - Since the dict was the same object already referenced by `entry.options`, HA's old-vs-new equality check saw no difference and never scheduled a save to `.storage/core.config_entries`
+  - The switch looked correct in the UI (it reads live from the same mutated dict) but reverted to its last saved value on every HA restart
+  - Fix: build a fresh copy of `detected_entities` before mutating it, so the change is actually persisted to disk
+
+### Removed
+- **Master Switch** (`switch.intuitherm_master_switch`)
+  - Demo Mode is now the primary user-facing control from Home Assistant
+  - Automatic control status remains visible read-only via `sensor.optimization_status`
+
 ## [2026.04.07.2] - 2026-04-07
 
 ### Added
