@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     DOMAIN,
     DATA_COORDINATOR,
-    SWITCH_TYPE_AUTO_CONTROL,
     SWITCH_TYPE_DEMO_MODE,
     CONF_DRY_RUN_MODE,
     CONF_DETECTED_ENTITIES,
@@ -34,123 +33,11 @@ async def async_setup_entry(
     ]
 
     switches = [
-        IntuiThermAutoControlSwitch(coordinator, entry),
         IntuiThermDemoModeSwitch(coordinator, entry),
     ]
 
     async_add_entities(switches)
     _LOGGER.info("IntuiTherm switches added")
-
-
-class IntuiThermAutoControlSwitch(CoordinatorEntity, SwitchEntity):
-    """Master switch to enable/disable the entire optimization system."""
-
-    def __init__(
-        self, coordinator: IntuiThermCoordinator, entry: ConfigEntry
-    ) -> None:
-        """Initialize the switch."""
-        super().__init__(coordinator)
-        self._attr_name = "Master Switch"
-        self._attr_icon = "mdi:power"
-        self._attr_unique_id = f"{entry.entry_id}_{SWITCH_TYPE_AUTO_CONTROL}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": "Battery Optimizer",
-            "manufacturer": "IntuiHEMS",
-            "model": "Battery Optimization Service",
-            "sw_version": "1.0",
-        }
-        self._attr_entity_category = None  # Show prominently in controls
-
-    @property
-    def is_on(self) -> bool:
-        """Return true if automatic control is enabled."""
-        if not self.coordinator.data or self.coordinator.data is None:
-            return False
-
-        control_data = self.coordinator.data.get("control") if isinstance(self.coordinator.data, dict) else None
-        
-        if not control_data or isinstance(control_data, Exception):
-            return False
-
-        return control_data.get("automatic_control_enabled", False)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return additional state attributes."""
-        if not self.coordinator.data:
-            return {}
-
-        control_data = self.coordinator.data.get("control", {})
-
-        if isinstance(control_data, Exception):
-            return {"error": str(control_data)}
-
-        attrs = {}
-
-        # Add current mode
-        if "current_mode" in control_data:
-            attrs["current_mode"] = control_data["current_mode"]
-
-        # Add next review time
-        if "next_review_at" in control_data:
-            attrs["next_review"] = control_data["next_review_at"]
-
-        # Add last MPC run
-        if "last_mpc_run_at" in control_data:
-            attrs["last_mpc_run"] = control_data["last_mpc_run_at"]
-
-        # Add override status
-        if control_data.get("override_active"):
-            attrs["override_active"] = True
-            if "override_until" in control_data:
-                attrs["override_until"] = control_data["override_until"]
-
-        return attrs
-
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Turn on the master switch (enable optimization system)."""
-        _LOGGER.info("Enabling IntuiHEMS master switch - optimization system ON")
-
-        result = await self.coordinator.async_enable_auto_control()
-
-        if result.get("status") != "success":
-            _LOGGER.error(
-                "Failed to enable master switch: %s", result.get("detail")
-            )
-            # Still refresh to show current state
-            await self.coordinator.async_request_refresh()
-            return
-
-        _LOGGER.info("Optimization system enabled successfully")
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Turn off the master switch (disable optimization system)."""
-        _LOGGER.info("Disabling IntuiHEMS master switch - optimization system OFF")
-
-        result = await self.coordinator.async_disable_auto_control()
-
-        if result.get("status") != "success":
-            _LOGGER.error(
-                "Failed to disable master switch: %s", result.get("detail")
-            )
-            # Still refresh to show current state
-            await self.coordinator.async_request_refresh()
-            return
-
-        _LOGGER.info("Optimization system disabled successfully")
-        await self.coordinator.async_request_refresh()
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if not self.coordinator.last_update_success:
-            return False
-
-        # Check if control data is available and not an exception
-        control_data = self.coordinator.data.get("control", {})
-        return not isinstance(control_data, Exception)
 
 
 class IntuiThermDemoModeSwitch(CoordinatorEntity, SwitchEntity):
@@ -199,14 +86,21 @@ class IntuiThermDemoModeSwitch(CoordinatorEntity, SwitchEntity):
         """Enable demo mode."""
         _LOGGER.info("Enabling demo mode - MPC will run but won't control battery")
         
-        # Update config entry options
+        # Update config entry options. IMPORTANT: build a fresh copy of
+        # detected_entities rather than mutating it in place - the dict
+        # returned by config.get() may be the SAME object as
+        # self._entry.data[CONF_DETECTED_ENTITIES] (or a previous options
+        # dict). Mutating it in place before calling async_update_entry()
+        # makes HA's old-vs-new equality check see "no change", so the
+        # write is silently skipped and never persisted to disk - the
+        # toggle appears to work until the next HA restart, when it
+        # reverts to the last value that was actually saved.
         config = {**self._entry.data, **self._entry.options}
-        detected_entities = config.get(CONF_DETECTED_ENTITIES, {})
+        detected_entities = dict(config.get(CONF_DETECTED_ENTITIES, {}))
         detected_entities[CONF_DRY_RUN_MODE] = True
         
         # Update entry options
-        new_options = {**self._entry.options}
-        new_options[CONF_DETECTED_ENTITIES] = detected_entities
+        new_options = {**self._entry.options, CONF_DETECTED_ENTITIES: detected_entities}
         
         self.hass.config_entries.async_update_entry(
             self._entry,
@@ -220,14 +114,14 @@ class IntuiThermDemoModeSwitch(CoordinatorEntity, SwitchEntity):
         """Disable demo mode."""
         _LOGGER.info("Disabling demo mode - enabling battery control")
         
-        # Update config entry options
+        # Update config entry options (see async_turn_on for why we copy
+        # detected_entities instead of mutating it in place).
         config = {**self._entry.data, **self._entry.options}
-        detected_entities = config.get(CONF_DETECTED_ENTITIES, {})
+        detected_entities = dict(config.get(CONF_DETECTED_ENTITIES, {}))
         detected_entities[CONF_DRY_RUN_MODE] = False
         
         # Update entry options
-        new_options = {**self._entry.options}
-        new_options[CONF_DETECTED_ENTITIES] = detected_entities
+        new_options = {**self._entry.options, CONF_DETECTED_ENTITIES: detected_entities}
         
         self.hass.config_entries.async_update_entry(
             self._entry,

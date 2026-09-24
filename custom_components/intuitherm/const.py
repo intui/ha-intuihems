@@ -142,7 +142,6 @@ SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS: Final = "overall_arbitrage_savings"
 SENSOR_TYPE_OVERALL_CO2_AVOIDED: Final = "overall_co2_avoided"
 
 # Switch types
-SWITCH_TYPE_AUTO_CONTROL: Final = "automatic_control"
 SWITCH_TYPE_DEMO_MODE: Final = "demo_mode"
 
 # SolarEdge Command Mode
