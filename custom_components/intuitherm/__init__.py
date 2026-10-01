@@ -138,7 +138,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # For Huawei: battery_mode_select is required, battery_charge_power is optional (uses forcible_charge service)
     # For other brands: both battery_mode_select and battery_charge_power are required
     is_huawei = detected_entities.get("grid_charge_switch") is not None
-    is_solaredge = detected_entities.get(CONF_SOLAREDGE_COMMAND_MODE)
+    is_solaredge = detected_entities.get(CONF_SOLAREDGE_COMMAND_MODE) is not None
     has_mode_select = detected_entities.get(CONF_BATTERY_MODE_SELECT) is not None
     has_charge_power = detected_entities.get(CONF_BATTERY_CHARGE_POWER) is not None
     
