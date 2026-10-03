@@ -13,6 +13,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers import entity_registry as er, device_registry as dr, selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -70,6 +71,21 @@ from .const import (
     ENDPOINT_AUTH_REGISTER,
     ENDPOINT_HEALTH,
     DEVICE_CONTROL_MAPPINGS,
+    CONF_GUARD_SECTION,
+    CONF_GUARD_Z2_IMPORT_ENTITY,
+    CONF_GUARD_Z2_EXPORT_ENTITY,
+    CONF_GUARD_GRID_CT_ENTITIES,
+    CONF_GUARD_BATTERY_POWER_ENTITY,
+    CONF_GUARD_PV_POWER_ENTITY,
+    CONF_GUARD_LOAD_RUNNING_ENTITY,
+    CONF_GUARD_MIN_SOC_ENTITY,
+    CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY,
+    CONF_GUARD_SOC_THRESHOLD,
+    CONF_MODE_FORCE_DISCHARGE,
+    DEFAULT_GUARD_SOC_THRESHOLD,
+    DEFAULT_MODE_FORCE_DISCHARGE,
+    GUARD_FIELDS,
+    GUARD_REQUIRED_FIELDS,
 )
 from .device_learning import async_setup_device_learning
 
@@ -2245,11 +2261,18 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
         from .const import VERSION
 
         errors: dict[str, str] = {}
+        guard_input: dict[str, Any] = {}
 
         if user_input is not None:
             # Get current configuration
             current_config = {**self.config_entry.data, **self.config_entry.options}
-            
+
+            guard_input = user_input.get(CONF_GUARD_SECTION) or {}
+            if guard_input.get(CONF_GUARD_Z2_IMPORT_ENTITY) and any(
+                not guard_input.get(key) for key in GUARD_REQUIRED_FIELDS
+            ):
+                errors["base"] = "guard_missing_fields"
+
             if not errors:
                 # Update detected_entities with any changed sensors
                 detected_entities = current_config.get(CONF_DETECTED_ENTITIES, {}).copy()
@@ -2277,7 +2300,16 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                     detected_entities[CONF_MODE_BACKUP] = user_input[CONF_MODE_BACKUP]
                 if user_input.get(CONF_MODE_FORCE_CHARGE):
                     detected_entities[CONF_MODE_FORCE_CHARGE] = user_input[CONF_MODE_FORCE_CHARGE]
-                
+
+                # Unlike the fields above, an emptied guard field is removed: an empty
+                # Z2 import sensor is how the feature is switched off.
+                for key in GUARD_FIELDS:
+                    value = guard_input.get(key)
+                    if value in (None, "", []):
+                        detected_entities.pop(key, None)
+                    else:
+                        detected_entities[key] = value
+
                 # Build options dict with updated sensors and battery specs
                 # Note: Service URL and API key are preserved from original config (not user-editable)
                 options_data = {
@@ -2629,6 +2661,11 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                     description=f"Enter the exact option value for '{BATTERY_MODE_NAMES[BATTERY_MODE_FORCE_CHARGE]}'"
                 )] = str
 
+        # On a validation error, keep what the user typed in the section.
+        schema[vol.Required(CONF_GUARD_SECTION)] = section(
+            self._guard_section_schema({**detected_entities, **guard_input}),
+            {"collapsed": True},
+        )
 
         return self.async_show_form(
             step_id="init",
@@ -2643,7 +2680,66 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 "version": VERSION,
             },
         )
-    
+
+    def _guard_section_schema(self, values: dict[str, Any]) -> vol.Schema:
+        """Fields for the self-use guard (separate metering contract).
+
+        Pre-filled with suggested_value rather than default, so a field emptied by the
+        user stays empty and switches the feature off.
+        """
+        def suggested(key: str, fallback: Any = None) -> dict[str, Any]:
+            value = values.get(key, fallback)
+            return {"suggested_value": value} if value not in (None, "", []) else {}
+
+        def entity(domain: str) -> selector.EntitySelector:
+            return selector.EntitySelector(selector.EntitySelectorConfig(domain=domain))
+
+        mode_select = values.get(CONF_BATTERY_MODE_SELECT)
+        mode_state = self.hass.states.get(mode_select) if mode_select else None
+        mode_options = list((mode_state.attributes.get("options") or []) if mode_state else [])
+        detected_mode = next(
+            (o for o in mode_options if "force" in o.lower() and "discharge" in o.lower()),
+            DEFAULT_MODE_FORCE_DISCHARGE,
+        )
+        detected_power_number = next(
+            (
+                e.entity_id
+                for e in er.async_get(self.hass).entities.values()
+                if e.domain == "number" and not e.disabled_by and "force_discharge_power" in e.entity_id
+            ),
+            None,
+        )
+
+        return vol.Schema({
+            vol.Optional(CONF_GUARD_Z2_IMPORT_ENTITY, description=suggested(CONF_GUARD_Z2_IMPORT_ENTITY)): entity("sensor"),
+            vol.Optional(CONF_GUARD_Z2_EXPORT_ENTITY, description=suggested(CONF_GUARD_Z2_EXPORT_ENTITY)): entity("sensor"),
+            vol.Optional(
+                CONF_GUARD_GRID_CT_ENTITIES, description=suggested(CONF_GUARD_GRID_CT_ENTITIES)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", multiple=True)),
+            vol.Optional(CONF_GUARD_BATTERY_POWER_ENTITY, description=suggested(CONF_GUARD_BATTERY_POWER_ENTITY)): entity("sensor"),
+            vol.Optional(CONF_GUARD_PV_POWER_ENTITY, description=suggested(CONF_GUARD_PV_POWER_ENTITY)): entity("sensor"),
+            vol.Optional(CONF_GUARD_LOAD_RUNNING_ENTITY, description=suggested(CONF_GUARD_LOAD_RUNNING_ENTITY)): entity("binary_sensor"),
+            vol.Optional(CONF_GUARD_MIN_SOC_ENTITY, description=suggested(CONF_GUARD_MIN_SOC_ENTITY)): entity("number"),
+            vol.Optional(
+                CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY,
+                description=suggested(CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY, detected_power_number),
+            ): entity("number"),
+            vol.Optional(
+                CONF_MODE_FORCE_DISCHARGE, description=suggested(CONF_MODE_FORCE_DISCHARGE, detected_mode)
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=mode_options, custom_value=True, mode=selector.SelectSelectorMode.DROPDOWN
+                )
+            ),
+            vol.Optional(
+                CONF_GUARD_SOC_THRESHOLD, description=suggested(CONF_GUARD_SOC_THRESHOLD, DEFAULT_GUARD_SOC_THRESHOLD)
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0, max=100, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.BOX
+                )
+            ),
+        })
+
     async def _update_battery_config(self, config: dict, capacity_kwh: float, max_power_kw: float, latitude: float = None, longitude: float = None, elevation: float = None) -> None:
         """Update battery configuration on the backend."""
         service_url = config.get(CONF_SERVICE_URL, DEFAULT_SERVICE_URL)

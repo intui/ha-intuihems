@@ -5,6 +5,28 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.03.1] - 2026-10-03
+
+### Added
+- **Self-Use Guard (experimental)** for a controllable load (e.g. heat pump) metered on its own contract (Messkonzept 8.3)
+  - Problem: in `self_use` the inverter regulates its CT at the main meter Z1 to zero, so the battery also covered the heat pump, which sits between Z1 and the household meter Z2
+  - Solution: while the planned action is `self_use`, integral control on the Z2 net flow (real-time Z2 readout, e.g. Tibber) via the foxess_modbus Force Discharge setpoint (inverter AC output). Gains 0.5 up / 1.0 down, 0.1 kW deadband, settle window of poll + 3 s after each write
+  - Enters when the battery discharges and power flows out through Z2; exits (30 s confirmed) when the load is off (optional running indicator, else Z1 − Z2 estimate) or Z1 exports; exits immediately on min SoC, stale Z2 data (> 30 s) or unavailable inverter data
+  - SoC-dependent PV surplus routing: ≥ threshold (default 66 %) to the load, < threshold − 3 % into the battery
+  - Startup reset to Self Use if the inverter was left in Force Discharge or foxess_modbus's crash fallback (Feed-in First)
+  - The 15-minute executor no longer re-applies Self Use while the guard holds Force Discharge, and stops the guard before applying any other mode
+  - Collapsed options section; clearing the Z2 import sensor switches it off. The guard has its own Force Discharge power setting, so SolarEdge's `battery_discharge_power` is never touched
+  - Diagnostic sensor "Self-Use Guard"; fast-changing attributes excluded from the recorder
+  - Spec: `docs/PRD_HEATPUMP_SEPARATE_METERING_SELFUSE.md` (v1.2)
+
+### Changed
+- `hacs.json`: minimum Home Assistant **2024.7.0** (was 2024.4.0), required for `data_entry_flow.section`
+
+### Technical Details
+- New HA files: `guard_logic.py` (pure control logic, no HA imports), `self_use_guard.py` (HA adapter)
+- Changed HA files: `battery_control.py`, `__init__.py`, `config_flow.py`, `const.py`, `sensor.py`, `strings.json`, `translations/en.json`, `translations/de.json`, `manifest.json`
+- Tests: `tests/unit/control/test_self_use_guard_logic.py` (plain pytest), `tests/integration/control/test_self_use_guard_ha.py` (needs pytest-homeassistant-custom-component; skipped otherwise)
+
 ## [2026.09.24.2] - 2026-09-24
 
 ### Fixed

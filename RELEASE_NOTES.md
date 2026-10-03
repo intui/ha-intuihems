@@ -1,5 +1,32 @@
 # intuiHEMS Release Notes
 
+## v2026.10.03.1 - Self-Use Guard for Heat Pumps on a Separate Contract (experimental)
+
+**Released:** October 3, 2026
+
+### What's New
+
+#### 🔌 Self-Use Guard (experimental)
+For households whose heat pump (or another controllable load) has **its own electricity contract**, metered as in German Messkonzept 8.3. Until now, in Self Use the battery also powered the heat pump, because the inverter only sees the whole house. With the guard enabled, the battery covers only the household; the heat pump runs on PV surplus or its own grid supply.
+
+**You need:** a FoxESS inverter controlled via the foxess_modbus integration (with the "Force Discharge" work mode) and a real-time readout of your household meter Z2, for example Tibber Pulse.
+
+**How to enable:** Settings → Configure IntuiTherm Options → expand **"Separate metering contract (Messkonzept 8.3)"** and fill in the fields. Leave the Z2 import sensor empty to keep it off. We recommend turning on **Demo Mode** first: the guard then logs what it would do without changing anything. Watch the new **Self-Use Guard** diagnostic sensor.
+
+If you don't have this metering setup, nothing changes for you.
+
+### Changed
+- Minimum Home Assistant version is now **2024.7**.
+
+### Upgrade Instructions
+
+1. Make sure you run Home Assistant 2024.7 or newer
+2. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+3. Restart Home Assistant
+4. No reconfiguration required; the new section is optional
+
+---
+
 ## v2026.09.24.2 - User ID Display Fix + Version Info
 
 **Released:** September 24, 2026

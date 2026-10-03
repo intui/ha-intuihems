@@ -197,7 +197,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     battery_executor = entry_data.get(DATA_BATTERY_CONTROL)
     if battery_executor:
         _LOGGER.info("Stopping battery control executor")
-        battery_executor.stop()
+        await battery_executor.async_shutdown()
 
     # Unload platforms
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

@@ -11,7 +11,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfTime
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -33,6 +33,8 @@ from .const import (
     SENSOR_TYPE_OVERALL_PV_SAVINGS,
     SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS,
     SENSOR_TYPE_OVERALL_CO2_AVOIDED,
+    SENSOR_TYPE_SELF_USE_GUARD,
+    DATA_BATTERY_CONTROL,
     CONF_DETECTED_ENTITIES,
     CONF_DRY_RUN_MODE,
     ATTR_MODE,
@@ -43,8 +45,19 @@ from .const import (
     ATTR_DATABASE_STATUS,
 )
 from .coordinator import IntuiThermCoordinator
+from .self_use_guard import SelfUseGuard
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _device_info(entry: ConfigEntry) -> dict[str, Any]:
+    return {
+        "identifiers": {(DOMAIN, entry.entry_id)},
+        "name": "Battery Optimizer",
+        "manufacturer": "IntuiHEMS",
+        "model": "Battery Optimization Service",
+        "sw_version": "1.0",
+    }
 
 
 async def async_setup_entry(
@@ -82,6 +95,10 @@ async def async_setup_entry(
         IntuiThermOverallCO2AvoidedSensor(coordinator, entry),
     ]
 
+    executor = hass.data[DOMAIN][entry.entry_id].get(DATA_BATTERY_CONTROL)
+    if executor and executor.guard:
+        sensors.append(IntuiThermSelfUseGuardSensor(executor.guard, entry))
+
     async_add_entities(sensors)
     _LOGGER.info("sensors added")
 
@@ -104,13 +121,36 @@ class IntuiThermSensorBase(CoordinatorEntity, SensorEntity):
         self._attr_icon = icon
         self._entry = entry
         self._attr_unique_id = f"{entry.entry_id}_{sensor_type}"
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, entry.entry_id)},
-            "name": "Battery Optimizer",
-            "manufacturer": "IntuiHEMS",
-            "model": "Battery Optimization Service",
-            "sw_version": "1.0",
-        }
+        self._attr_device_info = _device_info(entry)
+
+
+class IntuiThermSelfUseGuardSensor(SensorEntity):
+    """State of the self-use guard (separate metering contract)."""
+
+    _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:transmission-tower-off"
+    # Updated every few seconds; keep only the setpoint and state in the recorder.
+    _unrecorded_attributes = frozenset(
+        {"setpoint_min_kw", "z2_net_import_kw", "controllable_load_estimate_kw"}
+    )
+
+    def __init__(self, guard: SelfUseGuard, entry: ConfigEntry) -> None:
+        self._guard = guard
+        self._attr_name = "Self-Use Guard"
+        self._attr_unique_id = f"{entry.entry_id}_{SENSOR_TYPE_SELF_USE_GUARD}"
+        self._attr_device_info = _device_info(entry)
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(self._guard.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def native_value(self) -> str:
+        return self._guard.status
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return self._guard.diagnostics
 
 
 class IntuiThermServiceHealthSensor(IntuiThermSensorBase):

@@ -133,8 +133,41 @@
           "mode_self_use": "The exact option name in your battery mode select for Self Use mode (battery charges from solar only). Example: 'Self Use', 'Self Consumption', 'PV Mode'.",
           "mode_backup": "The exact option name in your battery mode select for Backup mode (battery reserved for backup power). Example: 'Backup', 'UPS Mode', 'Reserve'.",
           "mode_force_charge": "The exact option name in your battery mode select for Force Charge mode (battery charges from grid). Example: 'Force Charge', 'Grid Charge', 'Charging'."
+        },
+        "sections": {
+          "separate_metering": {
+            "name": "Separate metering contract (Messkonzept 8.3) – experimental",
+            "description": "Only for a controllable load (e.g. heat pump) on its own electricity contract, metered between Z1 and the household meter Z2. Requires a FoxESS inverter via foxess_modbus and a real-time readout of Z2 (e.g. Tibber Pulse). While the plan is Self Use, the battery then covers only the household, never the controllable load. Leave the Z2 import sensor empty to keep this off.",
+            "data": {
+              "guard_z2_import_entity": "Z2 import power sensor",
+              "guard_z2_export_entity": "Z2 outbound power sensor",
+              "guard_grid_ct_entities": "Inverter grid CT power sensor(s)",
+              "guard_battery_power_entity": "Battery power sensor",
+              "guard_pv_power_entity": "PV power sensor",
+              "guard_load_running_entity": "Controllable load running indicator",
+              "guard_min_soc_entity": "Min SoC (number entity)",
+              "guard_force_discharge_power_entity": "Force Discharge power (number entity)",
+              "mode_force_discharge": "Force Discharge mode name",
+              "guard_soc_threshold": "SoC above which PV surplus goes to the controllable load"
+            },
+            "data_description": {
+              "guard_z2_import_entity": "Power drawn by the household through Z2 (e.g. Tibber 'Power'). Setting this switches the feature on.",
+              "guard_z2_export_entity": "Power flowing out of the household through Z2 (e.g. Tibber 'Power production').",
+              "guard_grid_ct_entities": "Inverter grid meter at Z1, feed-in positive. Three-phase inverters: select all phases (foxess_modbus: Grid CT R, S, T); they're summed.",
+              "guard_battery_power_entity": "Battery power, discharge positive (foxess_modbus: Inverter Battery Power).",
+              "guard_pv_power_entity": "Current PV power, ideally from the same integration as the battery sensor (foxess_modbus: PV Power).",
+              "guard_load_running_entity": "Optional binary sensor that is on while the load runs (e.g. IDM compressor state). Without it, the load is estimated from Z1 − Z2.",
+              "guard_min_soc_entity": "The inverter's minimum SoC (foxess_modbus: number.min_soc). Below it the guard hands back to Self Use.",
+              "guard_force_discharge_power_entity": "foxess_modbus: number.force_discharge_power.",
+              "mode_force_discharge": "Work mode option that starts Force Discharge.",
+              "guard_soc_threshold": "At or above this SoC, PV surplus flows to the controllable load; below it (minus 3 % hysteresis), it charges the battery."
+            }
+          }
         }
       }
+    },
+    "error": {
+      "guard_missing_fields": "The separate metering contract section is incomplete: all fields except the running indicator are required once the Z2 import sensor is set."
     }
   },
   "services": {

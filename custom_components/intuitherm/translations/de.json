@@ -100,8 +100,41 @@
           "mode_self_use": "Optionsname Ihres Wechselrichters für den Eigenverbrauch-Modus. In diesem Modus lädt Solar die Batterie und die Batterie versorgt Ihr Haus, ohne Netzladung. Typische Namen: 'Self Use', 'Eigenverbrauch'.",
           "mode_backup": "Optionsname Ihres Wechselrichters für den Backup/Reserve-Modus. In diesem Modus wird die Batterie für Notfall-Backup aufbewahrt. Typische Namen: 'Backup', 'USV-Modus', 'Reserve'.",
           "mode_force_charge": "Optionsname Ihres Wechselrichters für den Zwangsladung-Modus. In diesem Modus lädt die Batterie aktiv vom Netz mit der angegebenen Leistung. Typische Namen: 'Force Charge', 'Netzladung'."
+        },
+        "sections": {
+          "separate_metering": {
+            "name": "Separater Stromliefervertrag (Messkonzept 8.3) – experimentell",
+            "description": "Nur für eine steuerbare Last (z. B. Wärmepumpe) mit eigenem Stromliefervertrag, gemessen zwischen Z1 und dem Haushaltszähler Z2. Erfordert einen FoxESS-Wechselrichter über foxess_modbus und eine Echtzeit-Auslesung von Z2 (z. B. Tibber Pulse). Im geplanten Eigenverbrauch deckt die Batterie dann nur den Haushalt, nie die steuerbare Last. Z2-Bezugssensor leer lassen, um die Funktion auszuschalten.",
+            "data": {
+              "guard_z2_import_entity": "Z2-Bezugsleistung (Sensor)",
+              "guard_z2_export_entity": "Z2-Abgabeleistung (Sensor)",
+              "guard_grid_ct_entities": "Netz-CT-Leistung des Wechselrichters (Sensor/en)",
+              "guard_battery_power_entity": "Batterieleistung (Sensor)",
+              "guard_pv_power_entity": "PV-Leistung (Sensor)",
+              "guard_load_running_entity": "Betriebsanzeige der steuerbaren Last",
+              "guard_min_soc_entity": "Min. SoC (Number-Entität)",
+              "guard_force_discharge_power_entity": "Force-Discharge-Leistung (Number-Entität)",
+              "mode_force_discharge": "Name des Force-Discharge-Modus",
+              "guard_soc_threshold": "SoC, ab dem PV-Überschuss zur steuerbaren Last geht"
+            },
+            "data_description": {
+              "guard_z2_import_entity": "Bezug des Haushalts über Z2 (z. B. Tibber „Power“). Ist er gesetzt, ist die Funktion aktiv.",
+              "guard_z2_export_entity": "Leistung, die vom Haushalt über Z2 abfließt (z. B. Tibber „Power production“).",
+              "guard_grid_ct_entities": "Netzzähler des Wechselrichters an Z1, Einspeisung positiv. Dreiphasige Wechselrichter: alle Phasen auswählen (foxess_modbus: Grid CT R, S, T); sie werden addiert.",
+              "guard_battery_power_entity": "Batterieleistung, Entladen positiv (foxess_modbus: Inverter Battery Power).",
+              "guard_pv_power_entity": "Aktuelle PV-Leistung, idealerweise aus derselben Integration wie der Batteriesensor (foxess_modbus: PV Power).",
+              "guard_load_running_entity": "Optionaler Binärsensor, der eingeschaltet ist, solange die Last läuft (z. B. IDM-Verdichterstatus). Ohne ihn wird die Last aus Z1 − Z2 geschätzt.",
+              "guard_min_soc_entity": "Minimaler SoC des Wechselrichters (foxess_modbus: number.min_soc). Darunter wird an den Eigenverbrauch zurückgegeben.",
+              "guard_force_discharge_power_entity": "foxess_modbus: number.force_discharge_power.",
+              "mode_force_discharge": "Betriebsmodus-Option, die Force Discharge startet.",
+              "guard_soc_threshold": "Ab diesem SoC fließt PV-Überschuss zur steuerbaren Last; darunter (minus 3 % Hysterese) lädt er die Batterie."
+            }
+          }
         }
       }
+    },
+    "error": {
+      "guard_missing_fields": "Der Abschnitt zum separaten Stromliefervertrag ist unvollständig: Sobald der Z2-Bezugssensor gesetzt ist, sind alle Felder außer der Betriebsanzeige Pflicht."
     }
   },
   "services": {

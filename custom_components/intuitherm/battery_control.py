@@ -28,6 +28,7 @@ from .const import (
     SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
     SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID,
 )
+from .self_use_guard import SelfUseGuard
 
 if TYPE_CHECKING:
     from .coordinator import IntuiThermDataUpdateCoordinator
@@ -97,7 +98,9 @@ class BatteryControlExecutor:
         self._last_execution = None
         self._next_execution = None
         self._cancel_timer = None
-        
+
+        self.guard = SelfUseGuard.from_config(hass, self, config)
+
         _LOGGER.info(
             "BatteryControlExecutor initialized with entities: "
             f"mode={self.battery_mode_select}, "
@@ -123,14 +126,26 @@ class BatteryControlExecutor:
         # Schedule execution at the next aligned time
         self._schedule_next_execution()
 
+        if self.guard:
+            self.guard.async_schedule_startup_reset()
+
     def stop(self) -> None:
         """Stop the battery control executor."""
         if self._cancel_timer:
             self._cancel_timer()
             self._cancel_timer = None
-        
+
         self._enabled = False
         _LOGGER.info("Battery control executor stopped")
+
+    async def async_shutdown(self) -> None:
+        """Stop the executor and hand the inverter back to native Self Use if the guard holds it."""
+        self.stop()
+        await self._stop_guard(restore_self_use=True)
+
+    async def _stop_guard(self, restore_self_use: bool) -> None:
+        if self.guard and self.guard.running:
+            await self.guard.async_stop(restore_self_use=restore_self_use)
 
     def _get_next_aligned_time(self) -> datetime:
         """Get next aligned execution time (:00, :15, :30, :45)."""
@@ -192,6 +207,7 @@ class BatteryControlExecutor:
             
             if not control_data.get("automatic_control_enabled", False):
                 _LOGGER.debug("Automatic control disabled, skipping execution")
+                await self._stop_guard(restore_self_use=True)
                 return
             
             # Check if demo mode is enabled (dry_run)
@@ -264,16 +280,31 @@ class BatteryControlExecutor:
                 _LOGGER.info(
                     f"🎮 Demo mode: Would execute mode={mode}, power={power}kW at {now} (NOT executing)"
                 )
+                # The guard is built in dry-run mode here: it only logs what it would write.
+                if mode == "self_use" and self.guard:
+                    self.guard.async_start()
+                else:
+                    await self._stop_guard(restore_self_use=False)
                 return  # Don't execute in demo mode
-            
+
             _LOGGER.info(
                 f"Executing control: mode={mode}, power={power}kW at {now}"
             )
-            
-            success = await self._apply_control(mode, power)
-            
+
+            if mode != "self_use":
+                # Stop before the new mode is written so the guard can't override it.
+                await self._stop_guard(restore_self_use=False)
+
+            if mode == "self_use" and self.guard and self.guard.is_guarding:
+                _LOGGER.info("Self-use guard holds Force Discharge; not re-applying Self Use")
+                success = True
+            else:
+                success = await self._apply_control(mode, power)
+
             if success:
                 _LOGGER.info(f"Successfully executed control: {mode}")
+                if mode == "self_use" and self.guard:
+                    self.guard.async_start()
                 
                 # Send feedback to backend
                 await self._send_execution_feedback(

@@ -5,6 +5,21 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.03.1] - 2026-10-03
+
+### Added
+- **Self-Use Guard (experimental)** for a controllable load such as a heat pump that is metered on its own electricity contract (German Messkonzept 8.3: household meter Z2 behind the main meter Z1, heat pump in between)
+  - While the plan is Self Use, the battery covers only the household, never the heat pump
+  - Steers the household meter Z2 (real-time readout, e.g. Tibber Pulse) to zero by switching the inverter to Force Discharge and adjusting its setpoint; returns to native Self Use when the heat pump is off, the house exports, SoC reaches min SoC, or data is unavailable
+  - PV surplus goes to the heat pump at or above a configurable SoC (default 66 %) and charges the battery below it
+  - Configured in a new collapsed options section "Separate metering contract (Messkonzept 8.3)"; off unless the Z2 import sensor is set
+  - New diagnostic sensor "Self-Use Guard" (state: off / watching / guarding)
+  - Requires a FoxESS inverter via foxess_modbus; three-phase grid CT sensors are summed
+  - Respects Demo Mode: logs what it would do without writing
+
+### Changed
+- **Minimum Home Assistant version is now 2024.7** (needed for collapsible options sections)
+
 ## [2026.09.24.2] - 2026-09-24
 
 ### Fixed

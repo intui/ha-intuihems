@@ -91,6 +91,41 @@ CONF_GRID_EXPORT_PRICE: Final = "grid_export_price"  # Feed-in tariff (€/kWh)
 # Control mode configuration
 CONF_DRY_RUN_MODE: Final = "dry_run_mode"  # Test mode - MPC runs but doesn't send battery commands
 
+# Self-use guard: controllable load on a separate metering contract (Messkonzept 8.3).
+# Stored in detected_entities; configuring the Z2 import sensor activates the feature.
+CONF_GUARD_SECTION: Final = "separate_metering"
+CONF_GUARD_Z2_IMPORT_ENTITY: Final = "guard_z2_import_entity"
+CONF_GUARD_Z2_EXPORT_ENTITY: Final = "guard_z2_export_entity"
+CONF_GUARD_GRID_CT_ENTITIES: Final = "guard_grid_ct_entities"  # list (one per phase), summed; feed-in positive
+CONF_GUARD_BATTERY_POWER_ENTITY: Final = "guard_battery_power_entity"  # signed, discharge positive
+CONF_GUARD_PV_POWER_ENTITY: Final = "guard_pv_power_entity"
+CONF_GUARD_LOAD_RUNNING_ENTITY: Final = "guard_load_running_entity"  # optional binary sensor
+CONF_GUARD_MIN_SOC_ENTITY: Final = "guard_min_soc_entity"
+CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY: Final = "guard_force_discharge_power_entity"
+CONF_GUARD_SOC_THRESHOLD: Final = "guard_soc_threshold"
+CONF_MODE_FORCE_DISCHARGE: Final = "mode_force_discharge"
+DEFAULT_GUARD_SOC_THRESHOLD: Final = 66
+DEFAULT_MODE_FORCE_DISCHARGE: Final = "Force Discharge"
+# foxess_modbus leaves the inverter in this mode when remote control times out (HA crash)
+GUARD_CRASH_FALLBACK_MODES: Final = ("Feed-in First",)
+GUARD_POLL_INTERVAL_S: Final = 10  # foxess_modbus poll rate; sets the settle window
+GUARD_EVAL_INTERVAL_S: Final = 5
+GUARD_REQUIRED_FIELDS: Final = (
+    CONF_GUARD_Z2_EXPORT_ENTITY,
+    CONF_GUARD_GRID_CT_ENTITIES,
+    CONF_GUARD_BATTERY_POWER_ENTITY,
+    CONF_GUARD_PV_POWER_ENTITY,
+    CONF_GUARD_MIN_SOC_ENTITY,
+    CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY,
+    CONF_MODE_FORCE_DISCHARGE,
+)
+GUARD_FIELDS: Final = (
+    CONF_GUARD_Z2_IMPORT_ENTITY,
+    *GUARD_REQUIRED_FIELDS,
+    CONF_GUARD_LOAD_RUNNING_ENTITY,
+    CONF_GUARD_SOC_THRESHOLD,
+)
+
 # Default values
 DEFAULT_SERVICE_URL: Final = "https://api.intuihems.de"
 DEFAULT_UPDATE_INTERVAL: Final = 900  # seconds (15 minutes)
@@ -140,6 +175,7 @@ SENSOR_TYPE_OVERALL_SAVINGS: Final = "overall_savings"
 SENSOR_TYPE_OVERALL_PV_SAVINGS: Final = "overall_pv_savings"
 SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS: Final = "overall_arbitrage_savings"
 SENSOR_TYPE_OVERALL_CO2_AVOIDED: Final = "overall_co2_avoided"
+SENSOR_TYPE_SELF_USE_GUARD: Final = "self_use_guard"
 
 # Switch types
 SWITCH_TYPE_DEMO_MODE: Final = "demo_mode"
