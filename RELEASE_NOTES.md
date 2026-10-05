@@ -1,5 +1,36 @@
 # intuiHEMS Release Notes
 
+## v2026.10.05.1 - Self-Use Guard Improvements
+
+**Released:** October 5, 2026
+
+### Bug Fixes
+
+#### 🔁 Self-Use Guard switched without a running heat pump
+With a full battery and PV surplus, or right after a household appliance switched off, the guard could enter Force Discharge although the heat pump wasn't running, and then leave again shortly after. It now only steps in while the heat pump actually draws power and your house isn't exporting to the grid.
+
+#### ⏸️ Self-Use Guard stopped while working perfectly
+When the guard held the household meter at exactly 0 W, the unchanged meter value was mistaken for missing data, and the guard handed back to normal Self Use for a moment. Fixed.
+
+### What's New
+
+#### ⚡ Use a power meter for the heat pump
+The field "Controllable load: power sensor or running indicator" now also accepts a power sensor, for example a Shelly meter measuring the heat pump. This is the most precise option and lets the guard react faster when the heat pump stops. A binary on/off sensor still works.
+
+#### ▶️ Starts right away after a restart
+After a Home Assistant restart or after saving the options, the guard no longer waits for the next quarter hour.
+
+#### 🩺 Warning for wrong grid sensors
+If the selected grid CT sensors can't be right (for example "Grid Consumption" instead of "Grid CT"), the log shows a warning and the "Self-Use Guard" sensor shows `grid_ct_plausible: false`.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. Optional: if you have a power meter on your heat pump, select it in the "Separate metering contract" section
+
+---
+
 ## v2026.10.03.1 - Self-Use Guard for Heat Pumps on a Separate Contract (experimental)
 
 **Released:** October 3, 2026

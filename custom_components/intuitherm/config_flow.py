@@ -2718,7 +2718,9 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", multiple=True)),
             vol.Optional(CONF_GUARD_BATTERY_POWER_ENTITY, description=suggested(CONF_GUARD_BATTERY_POWER_ENTITY)): entity("sensor"),
             vol.Optional(CONF_GUARD_PV_POWER_ENTITY, description=suggested(CONF_GUARD_PV_POWER_ENTITY)): entity("sensor"),
-            vol.Optional(CONF_GUARD_LOAD_RUNNING_ENTITY, description=suggested(CONF_GUARD_LOAD_RUNNING_ENTITY)): entity("binary_sensor"),
+            vol.Optional(
+                CONF_GUARD_LOAD_RUNNING_ENTITY, description=suggested(CONF_GUARD_LOAD_RUNNING_ENTITY)
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])),
             vol.Optional(CONF_GUARD_MIN_SOC_ENTITY, description=suggested(CONF_GUARD_MIN_SOC_ENTITY)): entity("number"),
             vol.Optional(
                 CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY,

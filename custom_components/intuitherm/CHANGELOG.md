@@ -5,6 +5,21 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.05.1] - 2026-10-05
+
+### Fixed
+- **Self-Use Guard entered Force Discharge without a running heat pump**
+  - At full battery with PV surplus, or after a short overshoot at heat pump standby, the guard could enter and leave Force Discharge repeatedly (in one field test, 19 of 32 entries)
+  - Entry now also requires the controllable load to draw at least 0.2 kW and the main meter (Z1) not to export
+- **Self-Use Guard left Force Discharge while the household meter was balanced at 0 W**
+  - Unchanged real-time meter values were mistaken for stale data
+  - Freshness is now judged by when the sensor was last reported, not when its value last changed
+
+### Added
+- **Power sensor as controllable-load signal:** the "controllable load" field now also accepts a power sensor (e.g. a Shelly meter on the heat pump); running means at least 0.2 kW. Faster exits than with a binary indicator.
+- **Immediate resume:** after a restart or reload, the guard starts right away when the current plan is Self Use
+- **Grid CT plausibility check:** a warning in the log and `grid_ct_plausible: false` on the diagnostic sensor when the selected grid CT sensors can't be right (e.g. import-only "Grid Consumption" sensors)
+
 ## [2026.10.03.1] - 2026-10-03
 
 ### Added

@@ -132,7 +132,7 @@ class IntuiThermSelfUseGuardSensor(SensorEntity):
     _attr_icon = "mdi:transmission-tower-off"
     # Updated every few seconds; keep only the setpoint and state in the recorder.
     _unrecorded_attributes = frozenset(
-        {"setpoint_min_kw", "z2_net_import_kw", "controllable_load_estimate_kw"}
+        {"setpoint_min_kw", "z2_net_import_kw", "controllable_load_kw"}
     )
 
     def __init__(self, guard: SelfUseGuard, entry: ConfigEntry) -> None:

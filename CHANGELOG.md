@@ -5,6 +5,28 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.05.1] - 2026-10-05
+
+### Fixed
+- **Self-Use Guard: false entries** (field test Oct 3–5: 19 of 32 entries without a running heat pump; 9 of them as one-per-minute flapping at full battery)
+  - Root cause: entry only required "battery discharging and outflow at Z2", which PV surplus at SoC 100 % (with a small reported discharge) or a short overshoot after a load drop also satisfy
+  - Fix: entry also requires controllable load ≥ 0.2 kW (power sensor, else Z1 − Z2) and Z1 not exporting. Rule: never enter where an exit condition already holds
+- **Self-Use Guard: stale exits while Z2 was balanced at 0 W** (3 in the field test)
+  - Root cause: Z2 samples came from state-change events; Tibber's value stayed at 0 W, so no events fired for > 30 s
+  - Fix: the guard samples the Z2 sensors every 5 s and judges freshness by `last_reported`; each report counts once
+
+### Added
+- Controllable-load field accepts a power sensor (`sensor` or `binary_sensor`); with a power sensor the exit no longer needs the 180 s IDM trust window
+- Guard resumes immediately on setup/reload when the current plan entry is `self_use` (after the crash-leftover reset); plan lookup refactored into `BatteryControlExecutor._find_control`
+- Grid CT plausibility check (Z1 import ≥ Z2 import while Z2 imports ≥ 0.3 kW; ≥ 80 % violations over ≥ 30 samples → warning + `grid_ct_plausible: false`)
+- Diagnostic attributes `controllable_load_kw`, `controllable_load_source`, `grid_ct_plausible`
+- Field test report: `docs/reports/SELF_USE_GUARD_FIELD_TEST_2026-10.md` (+ PDF); spec v1.3
+
+### Technical Details
+- HA files: `guard_logic.py`, `self_use_guard.py`, `battery_control.py`, `config_flow.py`, `sensor.py`, `strings.json`, `translations/en.json`, `translations/de.json`, `manifest.json`
+- Tests: 38 logic tests, 28 HA-level tests; new regression tests use values from the recorded field data
+- Replay of the recorded field data: 19/19 false entries rejected, 13/13 real heat pump runs still detected (≤ 13 s later)
+
 ## [2026.10.03.1] - 2026-10-03
 
 ### Added

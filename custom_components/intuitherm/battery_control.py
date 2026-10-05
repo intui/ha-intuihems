@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Dict, List, Optional
 import logging
 
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.core import CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.util import dt as dt_util
 
@@ -127,7 +128,7 @@ class BatteryControlExecutor:
         self._schedule_next_execution()
 
         if self.guard:
-            self.guard.async_schedule_startup_reset()
+            self._schedule_guard_startup()
 
     def stop(self) -> None:
         """Stop the battery control executor."""
@@ -232,38 +233,8 @@ class BatteryControlExecutor:
                 _LOGGER.warning("Control plan is empty, skipping execution")
                 return
             
-            # Find control for current time window
-            # Match control at the current aligned quarter-hour mark
-            target_control = None
-            
-            # Calculate current aligned time (round down to last quarter hour)
-            current_minute = now.minute
-            aligned_minute = (current_minute // 15) * 15
-            current_aligned = now.replace(minute=aligned_minute, second=0, microsecond=0)
-            
-            _LOGGER.info(f"Looking for control at aligned time: {current_aligned}")
-            
-            for control in controls:
-                control_time_str = control.get("target_timestamp")
-                if not control_time_str:
-                    continue
-                
-                # Parse timestamp
-                try:
-                    control_time = datetime.fromisoformat(control_time_str.replace("Z", "+00:00"))
-                    control_time = dt_util.as_local(control_time)
-                except (ValueError, TypeError) as e:
-                    _LOGGER.error(f"Failed to parse control timestamp {control_time_str}: {e}")
-                    continue
-                
-                # Match exact quarter-hour (allow up to 30 seconds before/after for timing jitter)
-                time_diff = abs((control_time - current_aligned).total_seconds())
-                
-                if time_diff < 30:  # 30 seconds tolerance for exact match
-                    target_control = control
-                    _LOGGER.info(f"Found matching control for {current_aligned}: {control.get('control_action')}")
-                    break
-            
+            target_control = self._find_control(controls, now)
+
             if not target_control:
                 _LOGGER.info(f"No control found for current time {now}")
                 return
@@ -318,6 +289,48 @@ class BatteryControlExecutor:
         
         except Exception as e:
             _LOGGER.error(f"Error executing battery control: {e}", exc_info=True)
+
+    def _find_control(self, controls: List[Dict], now: datetime) -> Optional[Dict]:
+        """Return the plan entry for the current quarter hour (30 s tolerance), if any."""
+        aligned = now.replace(minute=(now.minute // 15) * 15, second=0, microsecond=0)
+        _LOGGER.info(f"Looking for control at aligned time: {aligned}")
+        for control in controls:
+            control_time_str = control.get("target_timestamp")
+            if not control_time_str:
+                continue
+            try:
+                control_time = dt_util.as_local(
+                    datetime.fromisoformat(control_time_str.replace("Z", "+00:00"))
+                )
+            except (ValueError, TypeError) as e:
+                _LOGGER.error(f"Failed to parse control timestamp {control_time_str}: {e}")
+                continue
+            if abs((control_time - aligned).total_seconds()) < 30:
+                _LOGGER.info(f"Found matching control for {aligned}: {control.get('control_action')}")
+                return control
+        return None
+
+    @callback
+    def _schedule_guard_startup(self) -> None:
+        if self.hass.state is CoreState.running:
+            self.hass.async_create_task(self._async_guard_startup())
+        else:
+            self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, self._on_ha_started)
+
+    @callback
+    def _on_ha_started(self, _event: Event) -> None:
+        self.hass.async_create_task(self._async_guard_startup())
+
+    async def _async_guard_startup(self) -> None:
+        """Undo a crash leftover, then resume the guard now instead of at the next quarter hour."""
+        await self.guard.async_startup_reset()
+        data = self.coordinator.data or {}
+        if not data.get("control", {}).get("automatic_control_enabled", False):
+            return
+        control = self._find_control(data.get("control_plan", {}).get("controls", []), dt_util.now())
+        if control and control.get("control_action") == "self_use":
+            _LOGGER.info("Current plan is Self Use; starting the self-use guard immediately")
+            self.guard.async_start()
 
     async def _call_service_resilient(
         self,

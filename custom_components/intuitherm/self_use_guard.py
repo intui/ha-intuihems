@@ -7,17 +7,13 @@ import logging
 from typing import TYPE_CHECKING, Any, Callable
 
 from homeassistant.const import (
-    EVENT_HOMEASSISTANT_STARTED,
     STATE_OFF,
     STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
-from homeassistant.core import CoreState, Event, HomeAssistant, State, callback
-from homeassistant.helpers.event import (
-    async_track_state_change_event,
-    async_track_time_interval,
-)
+from homeassistant.core import HomeAssistant, State, callback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -96,7 +92,8 @@ class SelfUseGuard:
         self._grid_ct: list[str] = list(detected[CONF_GUARD_GRID_CT_ENTITIES])
         self._battery_power = detected[CONF_GUARD_BATTERY_POWER_ENTITY]
         self._pv_power = detected[CONF_GUARD_PV_POWER_ENTITY]
-        self._load_running = detected.get(CONF_GUARD_LOAD_RUNNING_ENTITY) or None
+        # Either a binary sensor (on = running) or a power sensor (running above 0.2 kW).
+        self._load_entity = detected.get(CONF_GUARD_LOAD_RUNNING_ENTITY) or None
         self._min_soc = detected[CONF_GUARD_MIN_SOC_ENTITY]
         self._soc = detected[CONF_BATTERY_SOC_ENTITY]
         self._setpoint_entity = detected[CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY]
@@ -110,6 +107,7 @@ class SelfUseGuard:
         self._lock = asyncio.Lock()
         self._unsubs: list[Callable[[], None]] = []
         self._listeners: list[Callable[[], None]] = []
+        self._warned_grid_ct = False
         self.running = False
 
     @classmethod
@@ -137,9 +135,6 @@ class SelfUseGuard:
         self.running = True
         self._ctrl.reset("started")
         self._unsubs = [
-            async_track_state_change_event(
-                self.hass, [self._z2_import, self._z2_export], self._on_z2_change
-            ),
             async_track_time_interval(
                 self.hass, self._on_timer, timedelta(seconds=GUARD_EVAL_INTERVAL_S)
             ),
@@ -160,19 +155,8 @@ class SelfUseGuard:
         _LOGGER.info("Self-use guard stopped (was_guarding=%s)", was_guarding)
         self._notify()
 
-    @callback
-    def async_schedule_startup_reset(self) -> None:
+    async def async_startup_reset(self) -> None:
         """After a crash the inverter is left in Force Discharge or foxess_modbus's fallback mode."""
-        if self.hass.state is CoreState.running:
-            self.hass.async_create_task(self._async_startup_reset())
-        else:
-            self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, self._on_ha_started)
-
-    @callback
-    def _on_ha_started(self, _event: Event) -> None:
-        self.hass.async_create_task(self._async_startup_reset())
-
-    async def _async_startup_reset(self) -> None:
         state = self.hass.states.get(self._executor.battery_mode_select)
         if state is None or state.state not in (self._mode_force_discharge, *GUARD_CRASH_FALLBACK_MODES):
             return
@@ -184,13 +168,15 @@ class SelfUseGuard:
 
     # Inputs
 
-    @callback
-    def _on_z2_change(self, event: Event) -> None:
-        import_kw = _power_kw(self.hass.states.get(self._z2_import))
-        export_kw = _power_kw(self.hass.states.get(self._z2_export))
+    def _sample_z2(self) -> None:
+        # Freshness comes from last_reported: an unchanged value (e.g. 0 W while the guard
+        # balances Z2) fires no state change but is still reported.
+        states = [self.hass.states.get(self._z2_import), self.hass.states.get(self._z2_export)]
+        import_kw, export_kw = (_power_kw(state) for state in states)
         if import_kw is None or export_kw is None:
             return
-        self._ctrl.on_z2(dt_util.utcnow().timestamp(), import_kw, export_kw)
+        reported = max(state.last_reported for state in states)
+        self._ctrl.on_z2(reported.timestamp(), import_kw, export_kw)
 
     @callback
     def _on_timer(self, _now: Any) -> None:
@@ -198,12 +184,15 @@ class SelfUseGuard:
 
     def _snapshot(self) -> Snapshot:
         grid_ct = _sum_power_kw([self.hass.states.get(entity_id) for entity_id in self._grid_ct])
-        running, changed = None, None
-        if self._load_running:
-            state = self.hass.states.get(self._load_running)
-            if state is not None and state.state in (STATE_ON, STATE_OFF):
-                running = state.state == STATE_ON
-                changed = state.last_changed.timestamp()
+        running, changed, load_kw = None, None, None
+        if self._load_entity:
+            state = self.hass.states.get(self._load_entity)
+            if self._load_entity.startswith("binary_sensor."):
+                if state is not None and state.state in (STATE_ON, STATE_OFF):
+                    running = state.state == STATE_ON
+                    changed = state.last_changed.timestamp()
+            else:
+                load_kw = _power_kw(state)
         return Snapshot(
             grid_import_kw=None if grid_ct is None else -grid_ct,
             battery_discharge_kw=_power_kw(self.hass.states.get(self._battery_power)),
@@ -212,6 +201,7 @@ class SelfUseGuard:
             min_soc=_float_state(self.hass.states.get(self._min_soc)),
             load_running=running,
             load_changed_ts=changed,
+            load_kw=load_kw,
         )
 
     async def _async_evaluate(self) -> None:
@@ -220,10 +210,19 @@ class SelfUseGuard:
         async with self._lock:
             if not self.running:
                 return
+            self._sample_z2()
             now = dt_util.utcnow().timestamp()
             decision = self._ctrl.on_poll(now, self._snapshot())
             if decision.action is not Action.NONE:
                 await self._apply(decision)
+            if self._ctrl.grid_ct_implausible and not self._warned_grid_ct:
+                self._warned_grid_ct = True
+                _LOGGER.warning(
+                    "Self-use guard: grid CT sensors %s look wrong. Z1 import is mostly below Z2 import, "
+                    "which is physically impossible. Use the signed Grid CT sensors (feed-in positive), "
+                    "not import-only ones such as 'Grid Consumption'",
+                    ", ".join(self._grid_ct),
+                )
         self._notify()
 
     # Outputs
@@ -294,7 +293,9 @@ class SelfUseGuard:
             "setpoint_kw": ctrl.setpoint_kw,
             "setpoint_min_kw": ctrl.a_min,
             "z2_net_import_kw": ctrl.last_n_mean,
-            "controllable_load_estimate_kw": ctrl.last_load_estimate,
+            "controllable_load_kw": ctrl.last_load_kw,
+            "controllable_load_source": ctrl.load_source,
+            "grid_ct_plausible": not ctrl.grid_ct_implausible,
             "pv_surplus_to_load": ctrl.surplus_to_load,
             "soc_threshold": ctrl.soc_threshold,
             "last_reason": ctrl.last_reason,
