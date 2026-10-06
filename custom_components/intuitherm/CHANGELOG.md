@@ -5,6 +5,14 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.06.1] - 2026-10-06
+
+### Fixed
+- **Self-Use Guard and fast-switching household appliances**
+  - An appliance switching on and off faster than the guard's ~30 s control loop (e.g. a hob cycling about once a minute) made the battery push power to the heat pump in the appliance's off-phases, and could end Force Discharge via `z1_exporting`
+  - Setpoint increases are now capped at the household base load of the last 60 s; reductions stay immediate. Sustained load increases are followed after about 60 s
+- **False grid CT plausibility warning** with fast-switching loads: the check now only counts steady moments
+
 ## [2026.10.05.1] - 2026-10-05
 
 ### Fixed

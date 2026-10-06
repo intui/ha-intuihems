@@ -26,10 +26,17 @@ SOC_HYSTERESIS_PCT = 3.0
 # foxess_modbus applies a new setpoint at its next poll; Z2 readings before that would be
 # corrected twice. Default = 10 s poll + 3 s for Tibber to report the effect.
 DEFAULT_SETTLE_S = 13.0
+# Increases are capped at the lowest household load implied over this window. An appliance
+# switching faster than the ~30 s control loop then takes its on-phases from the grid,
+# instead of the battery pushing power to the controllable load in its off-phases.
+BASE_LOAD_WINDOW_S = 60.0
 # Physics: Z1 import = Z2 import + controllable load >= Z2 import. Grid CT sensors that
 # violate this most of the time while Z2 imports have the wrong sign or are import-only.
 PLAUSIBILITY_MIN_Z2_KW = 0.3
 PLAUSIBILITY_TOLERANCE_KW = 0.3
+# Only steady moments count: with fast-switching loads, Tibber and FoxESS readings taken at
+# different instants contradict each other even when the sensors are right.
+PLAUSIBILITY_STEADY_KW = 0.2
 PLAUSIBILITY_MIN_SAMPLES = 30
 PLAUSIBILITY_BAD_RATIO = 0.8
 
@@ -91,6 +98,8 @@ class GuardController:
         self.grid_ct_implausible = False
         self._plaus_samples = 0
         self._plaus_bad = 0
+        self._prev_plaus_n: float | None = None
+        self._implied_load: list[tuple[float, float]] = []
         self.a_min: float | None = None
         self._z2_buffer: list[float] = []
         self._last_z2_ts: float | None = None
@@ -115,6 +124,7 @@ class GuardController:
         self.a_min = None
         self._settle_until = float("-inf")
         self._z2_buffer = []
+        self._implied_load = []
         self._entered_ts = None
         self._exit_since = None
         self._outbound_streak = 0
@@ -155,9 +165,14 @@ class GuardController:
         return n_mean
 
     def _check_plausibility(self, grid_import_kw: float, n_fresh: float | None) -> None:
+        if n_fresh is None:
+            return
+        prev, self._prev_plaus_n = self._prev_plaus_n, n_fresh
+        if prev is None or abs(n_fresh - prev) >= PLAUSIBILITY_STEADY_KW:
+            return
         # Only while Z2 imports: then Z1 must import at least as much, while import-only
         # sensors read with the wrong sign show <= 0 every time.
-        if n_fresh is None or n_fresh < PLAUSIBILITY_MIN_Z2_KW:
+        if n_fresh < PLAUSIBILITY_MIN_Z2_KW:
             return
         self._plaus_samples += 1
         self._plaus_bad += grid_import_kw < n_fresh - PLAUSIBILITY_TOLERANCE_KW
@@ -196,6 +211,7 @@ class GuardController:
             self._entered_ts = now
             self._settle_until = now + self.settle_s
             self._z2_buffer = []
+            self._implied_load = [(now, household_kw)]
             self._exit_since = None
             self.last_reason = "battery_feeding_controllable_load"
             return Decision(Action.ENTER, self.setpoint_kw, self.last_reason)
@@ -228,10 +244,17 @@ class GuardController:
             self._exit_since = None
 
         current = self.setpoint_kw if self.setpoint_kw is not None else a_min
+        settled = now >= self._settle_until and n_fresh is not None
+        if settled:
+            self._implied_load.append((now, current + n_fresh))
+        self._implied_load = [(t, v) for t, v in self._implied_load if now - t <= BASE_LOAD_WINDOW_S]
         target = current
-        if now >= self._settle_until and n_fresh is not None and abs(n_fresh) >= DEADBAND_KW:
-            gain = GAIN_UP if n_fresh > 0 else GAIN_DOWN
-            target = current + gain * n_fresh
+        if settled and abs(n_fresh) >= DEADBAND_KW:
+            if n_fresh > 0:
+                base_load = min(v for _, v in self._implied_load)
+                target = min(current + GAIN_UP * n_fresh, max(base_load, current))
+            else:
+                target = current + GAIN_DOWN * n_fresh
         target = round(clamp(target, a_min, a_max), 2)
         if abs(target - current) < MIN_SETPOINT_CHANGE_KW:
             return Decision(Action.NONE)

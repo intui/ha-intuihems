@@ -5,6 +5,22 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.06.1] - 2026-10-06
+
+### Fixed
+- **Self-Use Guard: cycling household loads** (night of Oct 5–6: an appliance switching ~2.2 kW about once a minute during a heating run; 39 % of that run's heat pump energy came from the battery, 3 `z1_exporting` exits)
+  - Root cause: the integral control loop (foxess_modbus 10 s poll + 13 s settle + Tibber ~12 s) lags a load that switches every ~30–60 s, so the setpoint stayed high in the off-phases
+  - Fix: setpoint increases capped at the lowest household load implied by settled Z2 readings over the last 60 s (`BASE_LOAD_WINDOW_S`), seeded at entry with the household estimate; reductions unchanged
+  - Closed-loop simulation with the real controller on the recorded load: battery → heat pump 0.18 → 0.05 kWh, exits 1 → 0, setpoint writes 63 → 22; household grid import 0.32 → 0.58 kWh (intended trade-off)
+- **Grid CT plausibility false positive:** samples only count when two consecutive Z2 values differ by < 0.2 kW (`PLAUSIBILITY_STEADY_KW`); replay of the evening no longer triggers
+
+### Added
+- Reports: `docs/reports/SELF_USE_GUARD_MIDDAY_2026-10-05.md` (midday heat pump run, Force Charge semantics with PV) and `docs/reports/SELF_USE_GUARD_NIGHT_2026-10-06.md` (first night with v2026.10.05.1), each with PDF; spec v1.4
+
+### Technical Details
+- HA files: `guard_logic.py`, `manifest.json`
+- Tests: 43 logic tests (new: cycling appliance, sustained increase, immediate reduction, window after entry, fast-switching plausibility), 28 HA-level tests
+
 ## [2026.10.05.1] - 2026-10-05
 
 ### Fixed

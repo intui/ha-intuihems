@@ -1,5 +1,25 @@
 # intuiHEMS Release Notes
 
+## v2026.10.06.1 - Self-Use Guard: Fast-Switching Appliances
+
+**Released:** October 6, 2026
+
+### Bug Fixes
+
+#### 🍳 Battery power reached the heat pump while an appliance was cycling
+When a household appliance switched on and off quickly (for example a hob or oven cycling about once a minute) while the heat pump ran, the guard always reacted a step too late. In the appliance's off-phases, battery power then flowed to the heat pump or into the grid, and the guard sometimes handed back to normal Self Use. The guard now covers only the household's base load during such phases; the appliance's short peaks come from the grid. That grid energy is nearly free, because the battery keeps its charge for later.
+
+#### 🩺 False "grid CT not plausible" warning
+With fast-switching loads, the plausibility check of the grid CT sensors could raise a warning although the sensors were configured correctly. It now only judges steady moments.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. No reconfiguration required
+
+---
+
 ## v2026.10.05.1 - Self-Use Guard Improvements
 
 **Released:** October 5, 2026
