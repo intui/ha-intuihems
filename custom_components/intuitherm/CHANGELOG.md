@@ -5,6 +5,19 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.06.2] - 2026-10-06
+
+### Fixed
+- **FoxESS (foxess_modbus): Force Charge charged with all PV on top of the planned power**
+  - foxess_modbus treats the Force Charge power as grid import and puts all PV into the battery on top, while the house and an EV are supplied from the grid
+  - During a planned Force Charge the battery now charges at the planned power: the integration steers the inverter's output via foxess_modbus remote control (Force Charge when PV is below the plan, Force Discharge with the PV surplus otherwise)
+  - PV beyond the plan covers the house first, then the battery; nothing is exported while the battery can charge. Above the configured maximum battery power, surplus is exported rather than curtailed
+  - With a full battery (SoC ≥ 99 %), native Self Use takes over for the rest of the quarter hour
+  - The required FoxESS entities are detected automatically; if one is missing, Force Charge works as before
+
+### Added
+- Diagnostic sensor "Force Charge Tracker" (FoxESS via foxess_modbus)
+
 ## [2026.10.06.1] - 2026-10-06
 
 ### Fixed

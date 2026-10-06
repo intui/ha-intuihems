@@ -29,6 +29,8 @@ from .const import (
     SOLAREDGE_COMMAND_MODE_MAXIMIZE_SELF_CONSUMPTION,
     SOLAREDGE_COMMAND_MODE_CHARGE_FROM_SOLAR_POWER_AND_GRID,
 )
+from .charge_tracker import ForceChargeTracker
+from .remote_control import is_foxess_modbus
 from .self_use_guard import SelfUseGuard
 
 if TYPE_CHECKING:
@@ -101,6 +103,15 @@ class BatteryControlExecutor:
         self._cancel_timer = None
 
         self.guard = SelfUseGuard.from_config(hass, self, config)
+        self.tracker = (
+            ForceChargeTracker(
+                hass, self,
+                soc_entity=detected_entities.get(CONF_BATTERY_SOC_ENTITY),
+                battery_max_kw=float(self.battery_max_power),
+                dry_run=bool(detected_entities.get(CONF_DRY_RUN_MODE, False)),
+            )
+            if is_foxess_modbus(hass, self.battery_mode_select) else None
+        )
 
         _LOGGER.info(
             "BatteryControlExecutor initialized with entities: "
@@ -127,8 +138,8 @@ class BatteryControlExecutor:
         # Schedule execution at the next aligned time
         self._schedule_next_execution()
 
-        if self.guard:
-            self._schedule_guard_startup()
+        if self.guard or self.tracker:
+            self._schedule_controller_startup()
 
     def stop(self) -> None:
         """Stop the battery control executor."""
@@ -140,13 +151,18 @@ class BatteryControlExecutor:
         _LOGGER.info("Battery control executor stopped")
 
     async def async_shutdown(self) -> None:
-        """Stop the executor and hand the inverter back to native Self Use if the guard holds it."""
+        """Stop the executor and hand the inverter back to native Self Use if guard or tracker holds it."""
         self.stop()
         await self._stop_guard(restore_self_use=True)
+        await self._stop_tracker(restore_self_use=True)
 
     async def _stop_guard(self, restore_self_use: bool) -> None:
         if self.guard and self.guard.running:
             await self.guard.async_stop(restore_self_use=restore_self_use)
+
+    async def _stop_tracker(self, restore_self_use: bool) -> None:
+        if self.tracker and self.tracker.running:
+            await self.tracker.async_stop(restore_self_use=restore_self_use)
 
     def _get_next_aligned_time(self) -> datetime:
         """Get next aligned execution time (:00, :15, :30, :45)."""
@@ -209,6 +225,7 @@ class BatteryControlExecutor:
             if not control_data.get("automatic_control_enabled", False):
                 _LOGGER.debug("Automatic control disabled, skipping execution")
                 await self._stop_guard(restore_self_use=True)
+                await self._stop_tracker(restore_self_use=True)
                 return
             
             # Check if demo mode is enabled (dry_run)
@@ -251,23 +268,33 @@ class BatteryControlExecutor:
                 _LOGGER.info(
                     f"🎮 Demo mode: Would execute mode={mode}, power={power}kW at {now} (NOT executing)"
                 )
-                # The guard is built in dry-run mode here: it only logs what it would write.
+                # Guard and tracker are built in dry-run mode here: they only log what they would write.
+                if mode != "self_use":
+                    await self._stop_guard(restore_self_use=False)
+                if mode != "force_charge":
+                    await self._stop_tracker(restore_self_use=False)
                 if mode == "self_use" and self.guard:
                     self.guard.async_start()
-                else:
-                    await self._stop_guard(restore_self_use=False)
+                elif mode == "force_charge" and self.tracker:
+                    self.tracker.async_start(power)
                 return  # Don't execute in demo mode
 
             _LOGGER.info(
                 f"Executing control: mode={mode}, power={power}kW at {now}"
             )
 
+            # Stop before the new mode is written so neither can override it.
             if mode != "self_use":
-                # Stop before the new mode is written so the guard can't override it.
                 await self._stop_guard(restore_self_use=False)
+            if mode != "force_charge":
+                await self._stop_tracker(restore_self_use=False)
 
             if mode == "self_use" and self.guard and self.guard.is_guarding:
                 _LOGGER.info("Self-use guard holds Force Discharge; not re-applying Self Use")
+                success = True
+            elif mode == "force_charge" and self.tracker and self.tracker.async_start(power):
+                # foxess_modbus treats the Force Charge power as grid import and adds all PV on top;
+                # the tracker charges the battery at the planned power instead.
                 success = True
             else:
                 success = await self._apply_control(mode, power)
@@ -311,26 +338,33 @@ class BatteryControlExecutor:
         return None
 
     @callback
-    def _schedule_guard_startup(self) -> None:
+    def _schedule_controller_startup(self) -> None:
         if self.hass.state is CoreState.running:
-            self.hass.async_create_task(self._async_guard_startup())
+            self.hass.async_create_task(self._async_controller_startup())
         else:
             self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, self._on_ha_started)
 
     @callback
     def _on_ha_started(self, _event: Event) -> None:
-        self.hass.async_create_task(self._async_guard_startup())
+        self.hass.async_create_task(self._async_controller_startup())
 
-    async def _async_guard_startup(self) -> None:
-        """Undo a crash leftover, then resume the guard now instead of at the next quarter hour."""
-        await self.guard.async_startup_reset()
+    async def _async_controller_startup(self) -> None:
+        """Undo a crash leftover, then resume guard or tracker now instead of at the next quarter hour."""
+        if self.guard:
+            await self.guard.async_startup_reset()
+        elif self.tracker:
+            await self.tracker.async_startup_reset()
         data = self.coordinator.data or {}
         if not data.get("control", {}).get("automatic_control_enabled", False):
             return
         control = self._find_control(data.get("control_plan", {}).get("controls", []), dt_util.now())
-        if control and control.get("control_action") == "self_use":
+        action = control.get("control_action") if control else None
+        if action == "self_use" and self.guard:
             _LOGGER.info("Current plan is Self Use; starting the self-use guard immediately")
             self.guard.async_start()
+        elif action == "force_charge" and self.tracker:
+            _LOGGER.info("Current plan is Force Charge; starting the Force Charge tracker immediately")
+            self.tracker.async_start(control.get("power_setpoint", 0.0))
 
     async def _call_service_resilient(
         self,

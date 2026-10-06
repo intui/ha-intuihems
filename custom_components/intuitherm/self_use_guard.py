@@ -6,13 +6,8 @@ from datetime import timedelta
 import logging
 from typing import TYPE_CHECKING, Any, Callable
 
-from homeassistant.const import (
-    STATE_OFF,
-    STATE_ON,
-    STATE_UNAVAILABLE,
-    STATE_UNKNOWN,
-)
-from homeassistant.core import HomeAssistant, State, callback
+from homeassistant.const import STATE_OFF, STATE_ON
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
@@ -33,46 +28,24 @@ from .const import (
     CONF_MODE_FORCE_DISCHARGE,
     DEFAULT_BATTERY_MAX_POWER,
     DEFAULT_GUARD_SOC_THRESHOLD,
-    GUARD_CRASH_FALLBACK_MODES,
     GUARD_EVAL_INTERVAL_S,
     GUARD_POLL_INTERVAL_S,
     GUARD_REQUIRED_FIELDS,
 )
 from .guard_logic import Action, Decision, GuardController, GuardState, Snapshot
+from .remote_control import (
+    async_reset_leftover,
+    async_write_mode,
+    async_write_number,
+    float_state,
+    power_kw,
+    sum_power_kw,
+)
 
 if TYPE_CHECKING:
     from .battery_control import BatteryControlExecutor
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def _float_state(state: State | None) -> float | None:
-    if state is None or state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-        return None
-    try:
-        return float(state.state)
-    except (TypeError, ValueError):
-        return None
-
-
-def _power_kw(state: State | None) -> float | None:
-    value = _float_state(state)
-    if value is None:
-        return None
-    unit = (state.attributes.get("unit_of_measurement") or "").lower()
-    if unit == "w":
-        return value / 1000
-    if unit == "mw":
-        return value * 1000
-    return value
-
-
-def _sum_power_kw(states: list[State | None]) -> float | None:
-    """Sum of per-phase powers; None if any phase is unavailable (a partial sum would mislead)."""
-    values = [_power_kw(state) for state in states]
-    if not values or any(v is None for v in values):
-        return None
-    return sum(values)
 
 
 class SelfUseGuard:
@@ -156,15 +129,7 @@ class SelfUseGuard:
         self._notify()
 
     async def async_startup_reset(self) -> None:
-        """After a crash the inverter is left in Force Discharge or foxess_modbus's fallback mode."""
-        state = self.hass.states.get(self._executor.battery_mode_select)
-        if state is None or state.state not in (self._mode_force_discharge, *GUARD_CRASH_FALLBACK_MODES):
-            return
-        _LOGGER.warning(
-            "Inverter work mode is '%s' at startup (left over from a stopped guard); restoring Self Use",
-            state.state,
-        )
-        await self._write_mode(self._executor.mode_self_use, "startup reset")
+        await async_reset_leftover(self.hass, self._executor, self._mode_force_discharge, self._dry_run)
 
     # Inputs
 
@@ -172,7 +137,7 @@ class SelfUseGuard:
         # Freshness comes from last_reported: an unchanged value (e.g. 0 W while the guard
         # balances Z2) fires no state change but is still reported.
         states = [self.hass.states.get(self._z2_import), self.hass.states.get(self._z2_export)]
-        import_kw, export_kw = (_power_kw(state) for state in states)
+        import_kw, export_kw = (power_kw(state) for state in states)
         if import_kw is None or export_kw is None:
             return
         reported = max(state.last_reported for state in states)
@@ -183,7 +148,7 @@ class SelfUseGuard:
         self.hass.async_create_task(self._async_evaluate())
 
     def _snapshot(self) -> Snapshot:
-        grid_ct = _sum_power_kw([self.hass.states.get(entity_id) for entity_id in self._grid_ct])
+        grid_ct = sum_power_kw([self.hass.states.get(entity_id) for entity_id in self._grid_ct])
         running, changed, load_kw = None, None, None
         if self._load_entity:
             state = self.hass.states.get(self._load_entity)
@@ -192,13 +157,13 @@ class SelfUseGuard:
                     running = state.state == STATE_ON
                     changed = state.last_changed.timestamp()
             else:
-                load_kw = _power_kw(state)
+                load_kw = power_kw(state)
         return Snapshot(
             grid_import_kw=None if grid_ct is None else -grid_ct,
-            battery_discharge_kw=_power_kw(self.hass.states.get(self._battery_power)),
-            pv_kw=_power_kw(self.hass.states.get(self._pv_power)),
-            soc=_float_state(self.hass.states.get(self._soc)),
-            min_soc=_float_state(self.hass.states.get(self._min_soc)),
+            battery_discharge_kw=power_kw(self.hass.states.get(self._battery_power)),
+            pv_kw=power_kw(self.hass.states.get(self._pv_power)),
+            soc=float_state(self.hass.states.get(self._soc)),
+            min_soc=float_state(self.hass.states.get(self._min_soc)),
             load_running=running,
             load_changed_ts=changed,
             load_kw=load_kw,
@@ -243,38 +208,10 @@ class SelfUseGuard:
             await self._write_mode(self._executor.mode_self_use, decision.reason)
 
     async def _write_setpoint(self, kw: float) -> bool:
-        state = self.hass.states.get(self._setpoint_entity)
-        unit = ((state.attributes.get("unit_of_measurement") if state else None) or "kW").lower()
-        value = round(kw * 1000) if unit == "w" else round(kw, 2)
-        if state is not None:
-            low, high = state.attributes.get("min"), state.attributes.get("max")
-            if high is not None:
-                value = min(value, high)
-            if low is not None:
-                value = max(value, low)
-        if self._dry_run:
-            _LOGGER.info("🎮 Demo mode: guard would set %s to %s", self._setpoint_entity, value)
-            return True
-        return await self._executor._call_service_resilient(
-            "number", "set_value",
-            {"entity_id": self._setpoint_entity, "value": value},
-            verify_entity=self._setpoint_entity,
-            verify_value=value,
-            description=f"Guard setpoint {value}",
-        )
+        return await async_write_number(self.hass, self._executor, self._setpoint_entity, kw, self._dry_run, "Guard")
 
     async def _write_mode(self, option: str, reason: str) -> bool:
-        if self._dry_run:
-            _LOGGER.info("🎮 Demo mode: guard would set work mode to %s (%s)", option, reason)
-            return True
-        select = self._executor.battery_mode_select
-        return await self._executor._call_service_resilient(
-            "select", "select_option",
-            {"entity_id": select, "option": option},
-            verify_entity=select,
-            verify_value=option,
-            description=f"Guard work mode {option} ({reason})",
-        )
+        return await async_write_mode(self._executor, option, self._dry_run, f"Guard ({reason})")
 
     # Observability
 

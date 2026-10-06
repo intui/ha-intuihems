@@ -1,5 +1,32 @@
 # intuiHEMS Release Notes
 
+## v2026.10.06.2 - FoxESS Force Charge at the Planned Power
+
+**Released:** October 6, 2026
+
+### Bug Fixes
+
+#### 🔋 FoxESS: Force Charge put all PV into the battery and the house on the grid
+*Affects FoxESS inverters controlled via the foxess_modbus integration.*
+
+When the optimiser planned to charge the battery from the grid while the sun was shining, FoxESS put **all PV into the battery on top of the planned charging power**. Meanwhile the house and an EV were supplied from the grid. In one example the battery charged at 5–6 kW instead of 1.25–3 kW, with several kWh more grid import than planned.
+
+The integration now steers the inverter so that the battery charges at the planned power. PV beyond that covers the house first, then goes into the battery; nothing is exported while the battery can still charge. In a simulation on recorded data, grid import during two half-hour Force Charge periods fell from 5.4 to 1.9 kWh.
+
+**Good to know:**
+- The battery charges at most at the **maximum power** set in the integration's options. If your battery can take more, raise that value; the optimiser plans with it too.
+- With a full battery, normal Self Use takes over until the next quarter hour.
+- A new diagnostic sensor, **Force Charge Tracker**, shows what the integration is doing during Force Charge.
+- No configuration needed: the required FoxESS entities are found automatically. If one is missing, Force Charge works as before.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. No reconfiguration required
+
+---
+
 ## v2026.10.06.1 - Self-Use Guard: Fast-Switching Appliances
 
 **Released:** October 6, 2026

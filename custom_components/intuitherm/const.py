@@ -106,8 +106,6 @@ CONF_GUARD_SOC_THRESHOLD: Final = "guard_soc_threshold"
 CONF_MODE_FORCE_DISCHARGE: Final = "mode_force_discharge"
 DEFAULT_GUARD_SOC_THRESHOLD: Final = 66
 DEFAULT_MODE_FORCE_DISCHARGE: Final = "Force Discharge"
-# foxess_modbus leaves the inverter in this mode when remote control times out (HA crash)
-GUARD_CRASH_FALLBACK_MODES: Final = ("Feed-in First",)
 GUARD_POLL_INTERVAL_S: Final = 10  # foxess_modbus poll rate; sets the settle window
 GUARD_EVAL_INTERVAL_S: Final = 5
 GUARD_REQUIRED_FIELDS: Final = (
@@ -176,6 +174,7 @@ SENSOR_TYPE_OVERALL_PV_SAVINGS: Final = "overall_pv_savings"
 SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS: Final = "overall_arbitrage_savings"
 SENSOR_TYPE_OVERALL_CO2_AVOIDED: Final = "overall_co2_avoided"
 SENSOR_TYPE_SELF_USE_GUARD: Final = "self_use_guard"
+SENSOR_TYPE_FORCE_CHARGE_TRACKER: Final = "force_charge_tracker"
 
 # Switch types
 SWITCH_TYPE_DEMO_MODE: Final = "demo_mode"

@@ -5,6 +5,25 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.06.2] - 2026-10-06
+
+### Fixed
+- **FoxESS (foxess_modbus): Force Charge semantics** (issue #11, spec `docs/PRD_FOXESS_FORCE_CHARGE_BATTERY_POWER.md` v1.1)
+  - The optimiser's `power_setpoint` for `force_charge` is the total battery charging power `p_bat`; foxess_modbus remote control sets the inverter's AC power (Force Charge X → battery = PV + X; Force Discharge A → battery = PV − A), so with PV the battery took PV + setpoint and the house drew from the grid (Oct 5: battery 5.2–6.2 kW instead of 1.25–3 kW, ~3.4 kWh extra grid import)
+  - New Force Charge tracker: signed inverter setpoint `A = PV − p_bat` once per foxess_modbus poll; Force Charge with `−A` (slow trim on measured battery power) or Force Discharge with `min(A, house load)`; mode switches only after the direction has been stable for 60 s
+  - Battery at the configured maximum power: output raised step by step (never above measured PV) so PV isn't curtailed; battery full (SoC ≥ 99 %): hand over to Self Use
+  - Entities detected automatically by unique ID on the foxess_modbus device (`pv_power_now`, `invbatpower`, `grid_ct` / `grid_ct_R/S/T`, `force_charge_power`, `force_discharge_power`, option "Force Discharge"), lazily at first use; fallback to the fixed Force Charge write if incomplete
+  - Startup: crash leftovers (Force Discharge / Feed-in First) reset to Self Use, and a current Force Charge quarter hour resumes immediately
+  - Simulation with the real tracker on the recorded Oct 5 windows: grid import 2.54 → 0.58 kWh (13:00–13:30) and 2.85 → 1.33 kWh (15:00–15:30), battery ≈ plan, no export
+
+### Changed
+- Shared remote-control helpers (`remote_control.py`) used by the self-use guard and the tracker
+
+### Technical Details
+- New HA files: `charge_tracker_logic.py` (pure logic), `charge_tracker.py` (HA adapter), `remote_control.py`
+- Changed HA files: `battery_control.py`, `self_use_guard.py`, `sensor.py`, `const.py`, `manifest.json`
+- Tests: 15 logic tests (inverter model with PV curtailment), 14 HA-level tests; 102 tests in total
+
 ## [2026.10.06.1] - 2026-10-06
 
 ### Fixed

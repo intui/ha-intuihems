@@ -34,6 +34,7 @@ from .const import (
     SENSOR_TYPE_OVERALL_ARBITRAGE_SAVINGS,
     SENSOR_TYPE_OVERALL_CO2_AVOIDED,
     SENSOR_TYPE_SELF_USE_GUARD,
+    SENSOR_TYPE_FORCE_CHARGE_TRACKER,
     DATA_BATTERY_CONTROL,
     CONF_DETECTED_ENTITIES,
     CONF_DRY_RUN_MODE,
@@ -45,6 +46,7 @@ from .const import (
     ATTR_DATABASE_STATUS,
 )
 from .coordinator import IntuiThermCoordinator
+from .charge_tracker import ForceChargeTracker
 from .self_use_guard import SelfUseGuard
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,6 +100,8 @@ async def async_setup_entry(
     executor = hass.data[DOMAIN][entry.entry_id].get(DATA_BATTERY_CONTROL)
     if executor and executor.guard:
         sensors.append(IntuiThermSelfUseGuardSensor(executor.guard, entry))
+    if executor and executor.tracker:
+        sensors.append(IntuiThermForceChargeTrackerSensor(executor.tracker, entry))
 
     async_add_entities(sensors)
     _LOGGER.info("sensors added")
@@ -151,6 +155,33 @@ class IntuiThermSelfUseGuardSensor(SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return self._guard.diagnostics
+
+
+class IntuiThermForceChargeTrackerSensor(SensorEntity):
+    """State of the Force Charge tracker (FoxESS via foxess_modbus)."""
+
+    _attr_should_poll = False
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:battery-charging-high"
+    # Updated every few seconds; keep only state, plan and setpoint in the recorder.
+    _unrecorded_attributes = frozenset({"house_load_kw", "trim_kw", "raise_kw"})
+
+    def __init__(self, tracker: ForceChargeTracker, entry: ConfigEntry) -> None:
+        self._tracker = tracker
+        self._attr_name = "Force Charge Tracker"
+        self._attr_unique_id = f"{entry.entry_id}_{SENSOR_TYPE_FORCE_CHARGE_TRACKER}"
+        self._attr_device_info = _device_info(entry)
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(self._tracker.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def native_value(self) -> str:
+        return self._tracker.status
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return self._tracker.diagnostics
 
 
 class IntuiThermServiceHealthSensor(IntuiThermSensorBase):
