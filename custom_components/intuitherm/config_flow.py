@@ -78,6 +78,7 @@ from .const import (
     CONF_GUARD_BATTERY_POWER_ENTITY,
     CONF_GUARD_PV_POWER_ENTITY,
     CONF_GUARD_LOAD_RUNNING_ENTITY,
+    CONF_GUARD_LOAD_ENERGY_ENTITY,
     CONF_GUARD_MIN_SOC_ENTITY,
     CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY,
     CONF_GUARD_SOC_THRESHOLD,
@@ -2721,6 +2722,10 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
             vol.Optional(
                 CONF_GUARD_LOAD_RUNNING_ENTITY, description=suggested(CONF_GUARD_LOAD_RUNNING_ENTITY)
             ): selector.EntitySelector(selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"])),
+            vol.Optional(
+                CONF_GUARD_LOAD_ENERGY_ENTITY,
+                description=suggested(CONF_GUARD_LOAD_ENERGY_ENTITY, self._suggest_load_energy(values)),
+            ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="energy")),
             vol.Optional(CONF_GUARD_MIN_SOC_ENTITY, description=suggested(CONF_GUARD_MIN_SOC_ENTITY)): entity("number"),
             vol.Optional(
                 CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY,
@@ -2741,6 +2746,35 @@ class IntuiThermOptionsFlowHandler(config_entries.OptionsFlow):
                 )
             ),
         })
+
+    def _suggest_load_energy(self, values: dict[str, Any]) -> str | None:
+        """Total energy counter on the same device as the controllable load's power sensor.
+
+        Only while the section is set up for the first time: once saved, an emptied field
+        must stay empty, or the next unrelated options save would switch the subtraction on.
+        """
+        power = values.get(CONF_GUARD_LOAD_RUNNING_ENTITY)
+        configured = self.config_entry.options.get(CONF_DETECTED_ENTITIES, self.config_entry.data.get(CONF_DETECTED_ENTITIES, {}))
+        if configured.get(CONF_GUARD_Z2_IMPORT_ENTITY) or CONF_GUARD_LOAD_ENERGY_ENTITY in values:
+            return None
+        if not power or not power.startswith("sensor."):
+            return None
+        registry = er.async_get(self.hass)
+        power_entry = registry.async_get(power)
+        if power_entry is None or not power_entry.device_id:
+            return None
+        for entry in er.async_entries_for_device(registry, power_entry.device_id):
+            state = self.hass.states.get(entry.entity_id)
+            if (
+                entry.domain == "sensor"
+                and not entry.disabled_by
+                and state is not None
+                and state.attributes.get("device_class") == "energy"
+                and state.attributes.get("state_class") == "total_increasing"
+                and not any(word in entry.entity_id for word in ("returned", "export", "phase"))
+            ):
+                return entry.entity_id
+        return None
 
     async def _update_battery_config(self, config: dict, capacity_kwh: float, max_power_kw: float, latitude: float = None, longitude: float = None, elevation: float = None) -> None:
         """Update battery configuration on the backend."""

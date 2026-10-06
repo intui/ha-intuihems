@@ -5,6 +5,15 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.06.3] - 2026-10-06
+
+### Added
+- **Separate metering: house load reported without the heat pump**
+  - New optional field "Controllable load: energy counter" in the "Separate metering" options section (e.g. the Shelly's total energy)
+  - When set, the house load sent to intuiHEMS excludes the heat pump, so the optimiser plans the battery for the household only
+  - No jump when switching on or off; heat pump energy is kept across restarts and meter outages; the 7-day backfill at startup is corrected the same way
+  - Diagnostic attribute `household_load_subtracted_kwh` on the Self-Use Guard sensor
+
 ## [2026.10.06.2] - 2026-10-06
 
 ### Fixed

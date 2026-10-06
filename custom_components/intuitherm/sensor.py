@@ -48,6 +48,7 @@ from .const import (
 from .coordinator import IntuiThermCoordinator
 from .charge_tracker import ForceChargeTracker
 from .self_use_guard import SelfUseGuard
+from .household_load import HouseholdLoad
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,7 +100,7 @@ async def async_setup_entry(
 
     executor = hass.data[DOMAIN][entry.entry_id].get(DATA_BATTERY_CONTROL)
     if executor and executor.guard:
-        sensors.append(IntuiThermSelfUseGuardSensor(executor.guard, entry))
+        sensors.append(IntuiThermSelfUseGuardSensor(executor.guard, entry, coordinator.household_load))
     if executor and executor.tracker:
         sensors.append(IntuiThermForceChargeTrackerSensor(executor.tracker, entry))
 
@@ -139,8 +140,9 @@ class IntuiThermSelfUseGuardSensor(SensorEntity):
         {"setpoint_min_kw", "z2_net_import_kw", "controllable_load_kw"}
     )
 
-    def __init__(self, guard: SelfUseGuard, entry: ConfigEntry) -> None:
+    def __init__(self, guard: SelfUseGuard, entry: ConfigEntry, household_load: HouseholdLoad | None = None) -> None:
         self._guard = guard
+        self._household_load = household_load
         self._attr_name = "Self-Use Guard"
         self._attr_unique_id = f"{entry.entry_id}_{SENSOR_TYPE_SELF_USE_GUARD}"
         self._attr_device_info = _device_info(entry)
@@ -154,7 +156,11 @@ class IntuiThermSelfUseGuardSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return self._guard.diagnostics
+        attributes = dict(self._guard.diagnostics)
+        if self._household_load is not None:
+            # Heat pump energy subtracted from the reported house load (separate metering)
+            attributes["household_load_subtracted_kwh"] = self._household_load.subtracted_kwh
+        return attributes
 
 
 class IntuiThermForceChargeTrackerSensor(SensorEntity):

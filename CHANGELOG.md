@@ -5,6 +5,27 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.06.3] - 2026-10-06
+
+### Added
+- **Separate metering: household load without the heat pump** (issue #14, spec `docs/PRD_HOUSEHOLD_LOAD_WITHOUT_CONTROLLABLE_LOAD.md` v1.1)
+  - Optional `guard_load_energy_entity` in the separate-metering section; suggested from the controllable load's device only on first setup
+  - House load reported under the same entity as `load_total − S`, where S is the heat pump energy subtracted since enabling (persisted in an HA `Store`); meter re-baselined on switch-on, entity change, reset and outage; S frozen while off
+  - Monotonic output (falls up to 0.5 kWh held back) so the house counter's 0.1 kWh steps never look like a meter reset to the backend
+  - Backfill: readings after the last switch on/off transformed with `S(t) = max(S − (hp_last − hp(t)), S at switch-on)`; earlier readings not resent
+  - Power-type house load: the controllable load's power is subtracted instead
+  - Replay of Sep 29 – Oct 5 (672 quarter hours): daily household energy within ±0.01 kWh of house − heat pump, no fall > 0.05 kWh
+
+### Fixed (backend)
+- **Back-up instead of Self Use with a full battery and PV surplus** (`mpc_controller._derive_control_modes`)
+  - Every quarter hour with an idle battery was mapped to Back-up. With a full battery and PV surplus that blocked the battery from covering load peaks above PV (test system, one week: 4.1 kWh grid import in 6.4 h of Back-up vs 0.35 kWh in 8.6 h of Self Use)
+  - Idle battery during forecast PV surplus now maps to Self Use; Back-up only when the house needs more than PV provides
+
+### Technical Details
+- New HA files: `household_load_logic.py` (pure logic), `household_load.py` (HA adapter)
+- Changed HA files: `coordinator.py`, `config_flow.py`, `const.py`, `sensor.py`, `strings.json`, `translations/*.json`, `manifest.json`
+- Tests: 14 logic tests, 8 HA tests; backend: 5 tests for the mode mapping
+
 ## [2026.10.06.2] - 2026-10-06
 
 ### Fixed

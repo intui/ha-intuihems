@@ -1,5 +1,33 @@
 # intuiHEMS Release Notes
 
+## v2026.10.06.3 - Household Load Without the Heat Pump, Self Use With a Full Battery
+
+**Released:** October 6, 2026
+
+### New Feature
+
+#### 🏠 Separate metering: house load reported without the heat pump
+*For installations with the heat pump on its own electricity contract (separate metering).*
+
+The house load sent to intuiHEMS used to include the heat pump, so the optimiser planned the battery for load it doesn't serve. In the "Separate metering" options section you can now select the heat pump's **energy counter** (for example the Shelly's total energy). intuiHEMS then plans with the household load only.
+
+- Leave the field empty to keep reporting as before.
+- Switching it on or off causes no jump in your data.
+- Your past data isn't changed; the forecast adapts within about a week.
+
+### Improvement
+
+#### ☀️ Full battery and PV surplus: Self Use instead of Back-up
+With a full battery and the sun shining, the plan often switched to Back-up. Short load peaks above the PV power then came from the grid instead of the battery. These periods now use Self Use; the PV surplus refills the battery right afterwards. This change is on the intuiHEMS server and applies to everyone automatically.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. Optional (separate metering): select the heat pump's energy counter under **Options → Separate metering**
+
+---
+
 ## v2026.10.06.2 - FoxESS Force Charge at the Planned Power
 
 **Released:** October 6, 2026

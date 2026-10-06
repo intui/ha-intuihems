@@ -100,6 +100,8 @@ CONF_GUARD_GRID_CT_ENTITIES: Final = "guard_grid_ct_entities"  # list (one per p
 CONF_GUARD_BATTERY_POWER_ENTITY: Final = "guard_battery_power_entity"  # signed, discharge positive
 CONF_GUARD_PV_POWER_ENTITY: Final = "guard_pv_power_entity"
 CONF_GUARD_LOAD_RUNNING_ENTITY: Final = "guard_load_running_entity"  # optional binary sensor
+# Optional energy counter of the controllable load: when set, the house load is reported without it
+CONF_GUARD_LOAD_ENERGY_ENTITY: Final = "guard_load_energy_entity"
 CONF_GUARD_MIN_SOC_ENTITY: Final = "guard_min_soc_entity"
 CONF_GUARD_FORCE_DISCHARGE_POWER_ENTITY: Final = "guard_force_discharge_power_entity"
 CONF_GUARD_SOC_THRESHOLD: Final = "guard_soc_threshold"
@@ -121,6 +123,7 @@ GUARD_FIELDS: Final = (
     CONF_GUARD_Z2_IMPORT_ENTITY,
     *GUARD_REQUIRED_FIELDS,
     CONF_GUARD_LOAD_RUNNING_ENTITY,
+    CONF_GUARD_LOAD_ENERGY_ENTITY,
     CONF_GUARD_SOC_THRESHOLD,
 )
 

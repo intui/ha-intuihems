@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from functools import partial
 from datetime import datetime, timezone, timedelta
 import logging
 from typing import Any
@@ -11,6 +12,7 @@ import numpy as np
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .household_load import HouseholdLoad
 from .const import (
     DOMAIN,
     ENDPOINT_HEALTH,
@@ -62,6 +64,8 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
         self._sensors_registered = False
         self._historic_data_sent = False  # Track if historic backfill completed
         self._last_sent_values = {}  # Track last sent value per sensor to avoid sending unchanged values
+        # Separate metering: house load reported without the heat pump
+        self.household_load = HouseholdLoad(hass, entry.entry_id) if entry else None
 
         _LOGGER.info(
             "IntuiTherm coordinator initialized (service: %s, interval: %s)",
@@ -357,6 +361,8 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
         # These are the user's final selections from the setup flow
         detected = config.get(CONF_DETECTED_ENTITIES, {})
         
+        await self.household_load.async_configure(detected)
+
         # Build list of selected sensors only
         selected_sensors = []
         
@@ -395,7 +401,9 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             if state and state.state not in ("unknown", "unavailable"):
                 try:
                     value = float(state.state)
-                    
+                    if sensor_type == "load" and entity_id == house_load:
+                        value = await self.household_load.async_live(entity_id, state, value)
+
                     # Only send if value has changed since last update
                     last_value = self._last_sent_values.get(entity_id)
                     if last_value is not None and abs(value - last_value) < 0.001:
@@ -550,6 +558,7 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
             
             # Get detected entities (sensors are stored under this key)
             detected = config.get(CONF_DETECTED_ENTITIES, {})
+            await self.household_load.async_configure(detected)
             
             # Calculate time range (7 days back)
             end_time = datetime.now(timezone.utc)
@@ -640,6 +649,17 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning("No historic data found for sensors")
                 return False
             
+            # Heat pump meter history, to report the house load without it (separate metering)
+            hp_states = []
+            if (hp_entity := self.household_load.backfill_entity) and house_load_entity in history_data:
+                hp_history = await recorder.async_add_executor_job(
+                    partial(
+                        state_changes_during_period, self.hass, start_time, end_time, hp_entity,
+                        include_start_time_state=True,
+                    )
+                )
+                hp_states = (hp_history or {}).get(hp_entity, [])
+
             # Create entity_id to sensor_type mapping
             sensor_type_map = {entity_id: sensor_type for entity_id, sensor_type in entities_to_backfill}
             
@@ -700,6 +720,9 @@ class IntuiThermCoordinator(DataUpdateCoordinator):
                             if unit: # Found valid attributes
                                 break
                 
+                if entity_id == house_load_entity:
+                    readings = self.household_load.backfill(current_state, readings, hp_states)
+
                 # For cumulative sensors, interpolate to quarter-hour marks
                 if is_cumulative and len(readings) >= 2:
                     original_count = len(readings)
