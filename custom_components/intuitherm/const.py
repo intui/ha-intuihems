@@ -91,7 +91,7 @@ CONF_GRID_EXPORT_PRICE: Final = "grid_export_price"  # Feed-in tariff (€/kWh)
 # Control mode configuration
 CONF_DRY_RUN_MODE: Final = "dry_run_mode"  # Test mode - MPC runs but doesn't send battery commands
 
-# Self-use guard: controllable load on a separate metering contract (Messkonzept 8.3).
+# Self-use guard: controllable load on a separate metering contract (cascaded meters).
 # Stored in detected_entities; configuring the Z2 import sensor activates the feature.
 CONF_GUARD_SECTION: Final = "separate_metering"
 CONF_GUARD_Z2_IMPORT_ENTITY: Final = "guard_z2_import_entity"

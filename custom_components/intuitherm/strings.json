@@ -136,7 +136,7 @@
         },
         "sections": {
           "separate_metering": {
-            "name": "Separate metering contract (Messkonzept 8.3) – experimental",
+            "name": "Separate metering contract (cascaded meters) – experimental",
             "description": "Only for a controllable load (e.g. heat pump) on its own electricity contract, metered between Z1 and the household meter Z2. Requires a FoxESS inverter via foxess_modbus and a real-time readout of Z2 (e.g. Tibber Pulse). While the plan is Self Use, the battery then covers only the household, never the controllable load. Leave the Z2 import sensor empty to keep this off.",
             "data": {
               "guard_z2_import_entity": "Z2 import power sensor",

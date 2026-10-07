@@ -1,4 +1,4 @@
-"""Control logic for the self-use guard (separate metering contract, Messkonzept 8.3).
+"""Control logic for the self-use guard (separate metering contract, cascaded meters).
 
 Kept free of Home Assistant imports so it can be unit-tested with plain pytest.
 All powers are in kW. See docs/PRD_HEATPUMP_SEPARATE_METERING_SELFUSE.md.

@@ -1,5 +1,22 @@
 # intuiHEMS Release Notes
 
+## v2026.10.07.2 - Clearer Name for Separate Metering
+
+**Released:** October 7, 2026
+
+### Changes
+
+#### 🏷️ "Separate metering" options section renamed
+The options section for a heat pump on its own electricity contract is now called **"Separate metering contract (cascaded meters)"**, in German **"Separater Stromliefervertrag (Zählerkaskade)"**. It used to mention "Messkonzept 8.3", which is the name only one grid operator uses. Your settings stay as they are.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. No reconfiguration required
+
+---
+
 ## v2026.10.07.1 - Resume After Restart
 
 **Released:** October 7, 2026

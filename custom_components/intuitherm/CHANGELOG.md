@@ -5,6 +5,11 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.07.2] - 2026-10-07
+
+### Changed
+- Options: the "Separate metering" section is now labelled with the general term **cascaded meters** (German: **Zählerkaskade**) instead of "Messkonzept 8.3", which is the name used by one grid operator only
+
 ## [2026.10.07.1] - 2026-10-07
 
 ### Fixed

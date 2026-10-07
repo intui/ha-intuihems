@@ -5,6 +5,15 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.07.2] - 2026-10-07
+
+### Changed
+- Options section label: "Separate metering contract (cascaded meters)" / "Separater Stromliefervertrag (Zählerkaskade)" instead of "Messkonzept 8.3", a BonnNetz-specific name (`strings.json`, `translations/en.json`, `translations/de.json`); code comments in `const.py` and `guard_logic.py` aligned
+
+### Technical Details
+- Changed HA files: `strings.json`, `translations/*.json`, `const.py` (comment), `guard_logic.py` (docstring), `manifest.json`
+- No behaviour change
+
 ## [2026.10.07.1] - 2026-10-07
 
 ### Fixed

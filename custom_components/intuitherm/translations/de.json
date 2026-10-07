@@ -103,7 +103,7 @@
         },
         "sections": {
           "separate_metering": {
-            "name": "Separater Stromliefervertrag (Messkonzept 8.3) – experimentell",
+            "name": "Separater Stromliefervertrag (Zählerkaskade) – experimentell",
             "description": "Nur für eine steuerbare Last (z. B. Wärmepumpe) mit eigenem Stromliefervertrag, gemessen zwischen Z1 und dem Haushaltszähler Z2. Erfordert einen FoxESS-Wechselrichter über foxess_modbus und eine Echtzeit-Auslesung von Z2 (z. B. Tibber Pulse). Im geplanten Eigenverbrauch deckt die Batterie dann nur den Haushalt, nie die steuerbare Last. Z2-Bezugssensor leer lassen, um die Funktion auszuschalten.",
             "data": {
               "guard_z2_import_entity": "Z2-Bezugsleistung (Sensor)",
