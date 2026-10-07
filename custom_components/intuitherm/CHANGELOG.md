@@ -5,6 +5,13 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.07.1] - 2026-10-07
+
+### Fixed
+- **Self-Use Guard and Force Charge tracker didn't resume after a restart or options save**
+  - After a Home Assistant restart, an integration reload or saving the options during a quarter hour, the guard (or tracker) stayed off until the next quarter hour, because the freshly fetched plan no longer contained the current one
+  - The integration now remembers the plan entry it is executing and resumes it immediately
+
 ## [2026.10.06.3] - 2026-10-06
 
 ### Added

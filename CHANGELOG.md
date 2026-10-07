@@ -5,6 +5,18 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.07.1] - 2026-10-07
+
+### Fixed
+- **Guard / tracker not resumed after a mid-quarter restart or options save** (`battery_control._async_controller_startup`)
+  - The startup lookup searched the backend plan for the current quarter hour, but the plan endpoint only returns entries from `now − 5 min`, and the optimiser run triggered by an options save starts at the next quarter hour (Oct 7: run 10:36:30, first entry 10:45). Field cases: Oct 6 11:10 (restart), Oct 7 10:36 (options save) — guard stayed off until the next quarter hour
+  - The executor now persists the executed plan entry (`target_timestamp`, `control_action`, `power_setpoint`) in an HA `Store` and uses it at startup when the plan lacks the current quarter hour; entries from other quarter hours are ignored
+  - Startup no longer raises when the coordinator has no control status or plan (`None` values)
+
+### Technical Details
+- Changed HA files: `battery_control.py`, `manifest.json`
+- Tests: 4 new HA tests (resume from stored entry, stale entry ignored, missing backend data); 54 HA tests in total
+
 ## [2026.10.06.3] - 2026-10-06
 
 ### Added

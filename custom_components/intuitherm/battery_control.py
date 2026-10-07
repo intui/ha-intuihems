@@ -14,6 +14,7 @@ import logging
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_time
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -72,6 +73,12 @@ class BatteryControlExecutor:
         """Initialize the battery control executor."""
         self.hass = hass
         self.coordinator = coordinator
+        # The plan entry being executed, kept across reloads and restarts: the backend's plan
+        # starts at the next quarter hour, so after a restart it lacks the current one.
+        entry = getattr(coordinator, "entry", None)
+        self._last_control_store: Store | None = (
+            Store(hass, 1, f"intuitherm.last_control.{entry.entry_id}") if entry else None
+        )
         self.config = config
         
         # Battery control entity IDs from config
@@ -259,6 +266,7 @@ class BatteryControlExecutor:
             # Execute the control
             mode = target_control.get("control_action")
             power = target_control.get("power_setpoint", 0.0)
+            await self._async_remember_control(target_control)
             
             # Check demo mode again before execution
             detected_entities = self.config.get(CONF_DETECTED_ENTITIES, {})
@@ -355,16 +363,38 @@ class BatteryControlExecutor:
         elif self.tracker:
             await self.tracker.async_startup_reset()
         data = self.coordinator.data or {}
-        if not data.get("control", {}).get("automatic_control_enabled", False):
+        if not (data.get("control") or {}).get("automatic_control_enabled", False):
             return
-        control = self._find_control(data.get("control_plan", {}).get("controls", []), dt_util.now())
+        now = dt_util.now()
+        control = self._find_control((data.get("control_plan") or {}).get("controls", []), now)
+        if control is None:
+            control = await self._async_remembered_control(now)
         action = control.get("control_action") if control else None
+        if control is None:
+            _LOGGER.info("No plan entry for the current quarter hour at startup; controllers start at the next one")
         if action == "self_use" and self.guard:
             _LOGGER.info("Current plan is Self Use; starting the self-use guard immediately")
             self.guard.async_start()
         elif action == "force_charge" and self.tracker:
             _LOGGER.info("Current plan is Force Charge; starting the Force Charge tracker immediately")
             self.tracker.async_start(control.get("power_setpoint", 0.0))
+
+    async def _async_remember_control(self, control: Dict) -> None:
+        if self._last_control_store is None:
+            return
+        await self._last_control_store.async_save({
+            key: control.get(key) for key in ("target_timestamp", "control_action", "power_setpoint")
+        })
+
+    async def _async_remembered_control(self, now: datetime) -> Optional[Dict]:
+        """The plan entry executed before a reload or restart, if it is for the current quarter hour."""
+        if self._last_control_store is None:
+            return None
+        stored = await self._last_control_store.async_load()
+        control = self._find_control([stored], now) if stored else None
+        if control:
+            _LOGGER.info("Resuming the plan entry executed before the restart: %s", control.get("control_action"))
+        return control
 
     async def _call_service_resilient(
         self,

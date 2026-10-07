@@ -1,5 +1,22 @@
 # intuiHEMS Release Notes
 
+## v2026.10.07.1 - Resume After Restart
+
+**Released:** October 7, 2026
+
+### Bug Fixes
+
+#### 🔁 Self-Use Guard and Force Charge tracker resume immediately after a restart
+After a Home Assistant restart, an integration reload or saving the options in the middle of a quarter hour, the Self-Use Guard (or the Force Charge tracker on FoxESS) stayed off until the next quarter hour. During that time the battery could supply the heat pump. Both now resume immediately.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. No reconfiguration required
+
+---
+
 ## v2026.10.06.3 - Household Load Without the Heat Pump, Self Use With a Full Battery
 
 **Released:** October 6, 2026
