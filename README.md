@@ -34,7 +34,7 @@ So wird dein Speicher genau dann geladen oder genutzt, wenn es wirtschaftlich un
 
 intuiHEMS befindet sich aktuell in der Alpha-Phase. Die Kernfunktionen sind stabil, dennoch können vereinzelt Bugs auftreten.
 
-Während der Alpha-Phase ist das Plugin kostenlos und auf **100 Tester limitiert**. Feedback aus der Community spielt dabei eine zentrale Rolle. Wenn Ihr dabei sein wollt, schreibt eine kurze Nachricht in das [Diskussionsforum](https://github.com/intui/ha-intuihems/discussions/categories/devices) mit der Beschreibung eures Systems: welche Batterie, Wechselrichter, dyn. Stromtarif.
+Während der Alpha-Phase ist das Plugin auf **100 Tester limitiert**. Feedback aus der Community spielt dabei eine zentrale Rolle. Wenn Ihr dabei sein wollt, schreibt eine kurze Nachricht in das [Diskussionsforum](https://github.com/intui/ha-intuihems/discussions/categories/devices) mit der Beschreibung eures Systems: welche Batterie, Wechselrichter, dyn. Stromtarif.
 
 ## 📋 Voraussetzungen
 
