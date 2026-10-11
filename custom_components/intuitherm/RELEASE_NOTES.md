@@ -1,5 +1,24 @@
 # intuiHEMS Release Notes
 
+## v2026.10.11.2 - Self Use After a Restart
+
+**Released:** October 11, 2026
+
+### Bug Fixes
+
+#### 🔄 FoxESS: inverter stayed in "Feed-in First" during a Home Assistant restart
+*Affects FoxESS inverters controlled via foxess_modbus.*
+
+If Home Assistant restarted while intuiHEMS had the inverter in Force Discharge or Force Charge, the inverter switched to "Feed-in First" (or "Back-up") until Home Assistant was running again. These are fallback modes foxess_modbus sets by itself. intuiHEMS now switches the inverter back to normal Self Use when Home Assistant shuts down.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. No reconfiguration required
+
+---
+
 ## v2026.10.11.1 - Steadier Force Charge in Sunshine
 
 **Released:** October 11, 2026

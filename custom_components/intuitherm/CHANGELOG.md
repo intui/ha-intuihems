@@ -5,6 +5,13 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.11.2] - 2026-10-11
+
+### Fixed
+- **Inverter left in "Feed-in First" after a Home Assistant restart** (FoxESS via foxess_modbus)
+  - While Force Discharge or Force Charge is active, foxess_modbus sets the inverter's own work mode to Feed-in First or Back-up, which takes over when Home Assistant stops
+  - intuiHEMS now switches the inverter back to Self Use when Home Assistant shuts down
+
 ## [2026.10.11.1] - 2026-10-11
 
 ### Fixed

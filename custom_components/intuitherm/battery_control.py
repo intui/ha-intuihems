@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional
 import logging
 
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.storage import Store
@@ -108,6 +108,7 @@ class BatteryControlExecutor:
         self._last_execution = None
         self._next_execution = None
         self._cancel_timer = None
+        self._unsub_stop: Callable[[], None] | None = None
 
         self.guard = SelfUseGuard.from_config(hass, self, config)
         self.tracker = (
@@ -147,12 +148,24 @@ class BatteryControlExecutor:
 
         if self.guard or self.tracker:
             self._schedule_controller_startup()
+            # foxess_modbus sets Feed-in First (Force Discharge) or Back-up (Force Charge) as the
+            # inverter's own work mode, which applies once its remote control stops. On an HA
+            # restart, hand the inverter back to Self Use while foxess_modbus is still connected.
+            self._unsub_stop = self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self._async_on_ha_stop)
+
+    async def _async_on_ha_stop(self, _event: Event) -> None:
+        self._unsub_stop = None  # already removed by async_listen_once
+        _LOGGER.info("Home Assistant is stopping: handing the inverter back to Self Use")
+        await self.async_shutdown()
 
     def stop(self) -> None:
         """Stop the battery control executor."""
         if self._cancel_timer:
             self._cancel_timer()
             self._cancel_timer = None
+        if self._unsub_stop:
+            self._unsub_stop()
+            self._unsub_stop = None
 
         self._enabled = False
         _LOGGER.info("Battery control executor stopped")

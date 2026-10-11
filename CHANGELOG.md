@@ -5,6 +5,18 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.11.2] - 2026-10-11
+
+### Fixed
+- **Self Use on HA stop** (`battery_control.py`)
+  - foxess_modbus's remote control writes the inverter's work mode register as a fallback: **Feed-in First** for Force Discharge ("we still want to feed in as much as possible"), **Back-up** for Force Charge. When HA stops, the remote-control watchdog (2 × poll interval) expires and the inverter runs in that mode. Field case Oct 11: HA restart at 14:11 while the guard held Force Discharge → Feed-in First until the startup reset at 14:13
+  - The executor listens for `EVENT_HOMEASSISTANT_STOP` and calls `async_shutdown()` (guard and tracker stopped with `restore_self_use=True`) while foxess_modbus is still connected; foxess_modbus only closes its client on unload. Previously this ran only on integration unload, not on an HA restart
+  - Not covered: crashes and power loss; the startup reset still handles those
+
+### Technical Details
+- Changed HA files: `battery_control.py`, `manifest.json`
+- Tests: 2 new HA tests (stop hands back to Self Use; unload removes the listener); 57 HA and 79 unit tests pass
+
 ## [2026.10.11.1] - 2026-10-11
 
 ### Fixed
