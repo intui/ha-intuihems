@@ -1,5 +1,26 @@
 # intuiHEMS Release Notes
 
+## v2026.10.11.1 - Steadier Force Charge in Sunshine
+
+**Released:** October 11, 2026
+
+### Bug Fixes
+
+#### ☀️ FoxESS: Force Charge no longer flips back and forth with passing clouds
+*Affects FoxESS inverters controlled via foxess_modbus.*
+
+When the sun produced about as much power as the planned battery charging, the integration switched the inverter between charging and discharging every few minutes. With a plan at the maximum battery power, the battery also charged slightly below plan and some solar power was exported.
+
+The integration now switches only after 3 minutes of stable conditions and checks whether raising the inverter output actually brings in more solar power before keeping it. On recorded data from three days, the number of switches halved and the exported solar power fell by more than half.
+
+### Upgrade Instructions
+
+1. Update the integration via HACS or manually copy `custom_components/intuitherm/` to your HA `config/custom_components/`
+2. Restart Home Assistant
+3. No reconfiguration required
+
+---
+
 ## v2026.10.07.2 - Clearer Name for Separate Metering
 
 **Released:** October 7, 2026

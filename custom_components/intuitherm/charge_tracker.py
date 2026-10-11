@@ -63,10 +63,15 @@ class ForceChargeTracker:
             self._entities = detect_foxess_entities(self.hass, self._executor.battery_mode_select)
             if self._entities is None:
                 return False
-        self._ctrl = ChargeTrackerController(
-            p_bat_kw, battery_max_kw=self._battery_max_kw, settle_s=GUARD_POLL_INTERVAL_S + 3,
-            poll_s=GUARD_POLL_INTERVAL_S,
-        )
+        if self.running and self._ctrl is not None and self._ctrl.mode in (TrackerMode.CHARGE, TrackerMode.DISCHARGE):
+            # Consecutive Force Charge quarter hours: keep the inverter's mode and corrections, so a
+            # quarter-hour boundary doesn't force a fresh start in Force Charge (Oct 8 15:00).
+            self._ctrl.set_plan(p_bat_kw)
+        else:
+            self._ctrl = ChargeTrackerController(
+                p_bat_kw, battery_max_kw=self._battery_max_kw, settle_s=GUARD_POLL_INTERVAL_S + 3,
+                poll_s=GUARD_POLL_INTERVAL_S,
+            )
         if not self.running:
             self.running = True
             self._unsub = async_track_time_interval(

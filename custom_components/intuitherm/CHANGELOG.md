@@ -5,6 +5,14 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.11.1] - 2026-10-11
+
+### Fixed
+- **FoxESS Force Charge with PV close to the plan** (foxess_modbus)
+  - When the sun produced about as much as the planned battery power, the inverter was switched between charging and discharging up to seven times in 35 minutes
+  - With a plan at the configured maximum battery power, the output stayed raised: the battery charged about 0.3 kW below plan and solar power was exported
+  - The tracker now switches only after 3 minutes of stable direction, raises the output only when that actually brings in more solar power, and keeps its state across consecutive Force Charge quarter hours
+
 ## [2026.10.07.2] - 2026-10-07
 
 ### Changed

@@ -15,9 +15,13 @@ from dataclasses import dataclass
 from enum import Enum
 
 DEADBAND_KW = 0.1
-# A switch between Force Charge and Force Discharge writes the work mode; only switch once the
-# direction has been stable this long, and hold the setpoint at 0 meanwhile.
-SWITCH_STABLE_S = 60.0
+# A switch between Force Charge and Force Discharge writes the work mode. Switch only once the
+# direction has been stable this long. Back from Force Discharge to Force Charge additionally needs
+# PV clearly below the plan (margin); in between, Force Discharge holds a setpoint of 0. No margin
+# the other way: staying in Force Charge with PV above the plan puts all PV into the battery and the
+# house on the grid. Replay of Oct 8/10/11: switches 17 -> 9, exported PV 1.06 -> 0.44 kWh.
+SWITCH_BACK_MARGIN_KW = 0.3
+SWITCH_STABLE_S = 180.0
 TRIM_GAIN = 0.3
 TRIM_LIMIT_KW = 0.5
 # Trim and saturation checks need measurements taken after the inverter applied the last
@@ -28,9 +32,12 @@ DEFAULT_POLL_S = 10.0
 # the battery's charging limit, the inverter curtails PV, and the PV sensor then only shows the
 # PV used, so available PV is invisible. While the battery charges at its limit, the output is
 # raised step by step (never above measured PV); once it charges clearly below, it's lowered.
+# Raising is a probe: if the battery charge drops by the step, there was no hidden PV, so the step
+# is undone and the next probe waits PROBE_HOLD_S. Without that, a plan at the configured maximum
+# kept the output raised permanently and exported PV (Oct 8, 10, 11).
 LIMIT_MARGIN_KW = 0.1
-LIMIT_RELEASE_KW = 0.5
 RAISE_STEP_KW = 0.3
+PROBE_HOLD_S = 300.0
 # A full battery can't take PV, and curtailment can't be detected: hand over to native Self Use.
 FULL_SOC_PCT = 99.0
 
@@ -83,6 +90,11 @@ class ChargeTrackerController:
         self._flip_since: float | None = None
         self._settle_until = float("-inf")
         self._last_measured = float("-inf")
+        self._probe_hold_until = float("-inf")
+
+    def set_plan(self, p_bat_kw: float) -> None:
+        """Next Force Charge quarter hour: keep mode, setpoint and corrections, update the plan."""
+        self.p_bat = clamp(p_bat_kw, 0.0, self.battery_max)
 
     def on_poll(self, now: float, inp: TrackerInputs) -> TrackerDecision | None:
         if self.mode in (TrackerMode.FALLBACK, TrackerMode.HANDOVER):
@@ -96,7 +108,7 @@ class ChargeTrackerController:
         house = inp.grid_import_kw + inp.pv_kw + inp.battery_discharge_kw
         self.last_house_kw = house
         a = inp.pv_kw - self.p_bat
-        wanted = TrackerMode.DISCHARGE if a >= 0 else TrackerMode.CHARGE
+        wanted = self._wanted_mode(a)
 
         mode = self._choose_mode(now, wanted)
         measured = now >= self._settle_until and now - self._last_measured >= self.poll_s
@@ -113,10 +125,12 @@ class ChargeTrackerController:
             target = clamp(min(a, house), 0.0, max(a, 0.0)) if wanted is TrackerMode.DISCHARGE else 0.0
             reason = "pv_surplus_to_house"
             if measured and self.mode is TrackerMode.DISCHARGE:
-                if charge_kw >= self.battery_max - LIMIT_MARGIN_KW:
-                    self.raise_kw += RAISE_STEP_KW
-                elif charge_kw < self.battery_max - LIMIT_RELEASE_KW:
+                if self.raise_kw > 0 and charge_kw < self.battery_max - RAISE_STEP_KW / 2:
+                    # The battery gave up the step: no hidden PV (any more). Undo and wait.
                     self.raise_kw = max(0.0, self.raise_kw - RAISE_STEP_KW)
+                    self._probe_hold_until = now + PROBE_HOLD_S
+                elif charge_kw >= self.battery_max - LIMIT_MARGIN_KW and now >= self._probe_hold_until:
+                    self.raise_kw += RAISE_STEP_KW
             if self.raise_kw > 0:
                 target = min(target + self.raise_kw, inp.pv_kw)
                 reason = "battery_at_limit"
@@ -130,6 +144,12 @@ class ChargeTrackerController:
         self.mode, self.setpoint_kw, self.last_reason = mode, target, reason
         self._settle_until = now + self.settle_s
         return TrackerDecision(mode if switched else None, target, reason)
+
+    def _wanted_mode(self, a: float) -> TrackerMode:
+        """Direction PV asks for, with hysteresis around the plan."""
+        if self.mode is TrackerMode.DISCHARGE:
+            return TrackerMode.CHARGE if a < -SWITCH_BACK_MARGIN_KW else TrackerMode.DISCHARGE
+        return TrackerMode.DISCHARGE if a >= 0 else TrackerMode.CHARGE
 
     def _choose_mode(self, now: float, wanted: TrackerMode) -> TrackerMode:
         if self.mode is None:

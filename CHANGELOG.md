@@ -5,6 +5,20 @@ All notable changes to the intuiHEMS Home Assistant integration will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.10.11.1] - 2026-10-11
+
+### Fixed
+- **Force Charge tracker: flapping and export with PV close to the plan** (`charge_tracker_logic.py`, `charge_tracker.py`)
+  - Field data Oct 8, 10 and 11: up to 7 Force Charge ↔ Force Discharge switches in 35 min; with `p_bat` = configured max, the "battery at limit" rule (raise when charge ≥ max − 0.1 kW) fired on target and kept the output raised (Oct 10: 277 times, 0.55 kWh exported; battery 2.63–2.67 kW vs 3.0 kW planned)
+  - Mode switch only after **180 s** of stable direction (was 60 s); Force Discharge → Force Charge additionally needs PV **> 0.3 kW below** the plan (`SWITCH_BACK_MARGIN_KW`); no margin the other way, so the battery doesn't take all PV with the house on the grid
+  - Raising is now a **probe**: if the battery charge drops below max − step/2, there was no hidden PV, so the step is undone and the next probe waits **300 s** (`PROBE_HOLD_S`). Replaces the fixed release threshold (max − 0.5 kW)
+  - Consecutive Force Charge quarter hours call `ChargeTrackerController.set_plan()` instead of creating a new controller: mode, trim and probe state are kept (Oct 8 15:00 restart in Force Charge)
+  - Replay of the recorded windows (Oct 8 14:15–15:30, Oct 10 13:45–16:45, Oct 11 12:45–13:45; inverter model with one-poll delay, validated against the measured old behaviour): switches 17 → 9, setpoint writes 446 → 364, exported PV 1.06 → 0.44 kWh, battery closer to plan
+
+### Technical Details
+- Changed HA files: `charge_tracker_logic.py`, `charge_tracker.py`, `manifest.json`
+- Tests: 6 new or rewritten logic tests (all fail against the previous logic), 1 new HA test; 79 unit and 55 HA tests pass
+
 ## [2026.10.07.2] - 2026-10-07
 
 ### Changed
